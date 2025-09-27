@@ -1,67 +1,195 @@
-import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, Pressable, ScrollView } from 'react-native';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
 import { useStore } from '@/store/AppStore';
 import { ProphetPoll } from '@/components/ProphetPoll';
 import { ActionChannel } from '@/components/ActionChannel';
+import { PartyChat } from '@/components/PartyChat';
+import { ParlayBuilder } from '@/components/ParlayBuilder';
 
 export const BoardScreen: React.FC = () => {
-  const { clutch, prizePool, parties, selectedPartyId, me, scores, pickOfDay, podChoice, podStreak, handlePodPick } = useStore();
-  const party = parties.find(p => p.id === selectedPartyId);
+  const { 
+    currentParty, 
+    partyPrizePools, 
+    clutch, 
+    poll, 
+    resolvedOptionId, 
+    votePoll,
+    pickOfDay,
+    podChoice,
+    podStreak,
+    handlePodPick,
+    partyScores,
+    me
+  } = useStore();
+  
+  const [showParlayBuilder, setShowParlayBuilder] = useState(false);
+
+  const avatarUrl = (name: string) => {
+    const seed = encodeURIComponent(name);
+    return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}&backgroundType=gradientLinear,gradientRadial&shapeColor=6f4df8,8b5cf6,22c55e,F6C945`;
+  };
+
+  const playerImageUrl = (seed: string) => {
+    const s = encodeURIComponent(seed);
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${s}&backgroundColor=0E0F13&mouth=smile,smirk&top=shortHair,shortFlat,shortRound&accessories=round&hairColor=2e3442`;
+  };
+
+  const formatLine = (line: string) => {
+    const l = line.toLowerCase();
+    if (l.startsWith("o/u")) {
+      const num = l.replace("o/u", "").trim();
+      return { text: `over/under ${num} yards`, num };
+    }
+    if (l.startsWith("tt o")) {
+      const num = l.replace("tt o", "").trim();
+      return { text: `team total over ${num} points`, num };
+    }
+    if (l.startsWith("tt u")) {
+      const num = l.replace("tt u", "").trim();
+      return { text: `team total under ${num} points`, num };
+    }
+    return { text: line, num: line.replace(/[^0-9.]/g, "") };
+  };
+
+  const currentScores = currentParty ? partyScores[currentParty.id] || {} : {};
+  const currentPrizePool = currentParty ? partyPrizePools[currentParty.id] || 0 : 0;
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.ink, padding: spacing(2) }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ padding: spacing(2) }}>
+      {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
-        <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '800' }}>{party?.name ?? 'ParlayParty'}</Text>
-        {party?.type !== 'friendly' && (
-          <Badge color={colors.primary}>Pool ${prizePool}</Badge>
-        )}
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '800' }}>
+            {currentParty?.name ?? 'ParlayParty'}
+          </Text>
+          {currentParty && (
+            <Text style={{ color: colors.textMid, fontSize: 12, textTransform: 'capitalize' }}>
+              {currentParty.type} party
+            </Text>
+          )}
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Badge color={colors.chip}>Points {currentScores[me] ?? 0}</Badge>
+          {currentParty?.type === 'competitive' && currentPrizePool > 0 && (
+            <Badge color={colors.gold}>Pool ${currentPrizePool}</Badge>
+          )}
+        </View>
       </View>
 
-      {/* Points + quick status */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing(1) }}>
-        <Badge>Points {scores[me] ?? 0}</Badge>
-        {party && <Text style={{ color: colors.textLow, fontSize: 12 }}>{party.type} party</Text>}
-      </View>
-
+      {/* Clutch Time */}
       {clutch && (
-        <Card trophy style={{ padding: 12, marginBottom: spacing(2), borderColor: colors.primary, borderWidth: 1 }}>
-          <Text style={{ color: colors.textLow, marginBottom: 6 }}>{clutch.game} • {clutch.user}</Text>
-          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 10 }}>{clutch.text}</Text>
-          <ProphetPoll />
+        <Card trophy style={{ marginBottom: spacing(2), borderColor: colors.primary, borderWidth: 1 }}>
+          <View style={{ padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Clutch Time</Text>
+              <Button variant="secondary" onPress={() => {/* Dismiss clutch */}}>
+                <Text style={{ fontSize: 12 }}>Dismiss</Text>
+              </Button>
+            </View>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <Image 
+                source={{ uri: avatarUrl(clutch.user) }} 
+                style={{ width: 40, height: 40, borderRadius: 20 }} 
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textLow, fontSize: 12 }}>{clutch.game} • {clutch.user}</Text>
+                <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '700' }}>{clutch.text}</Text>
+              </View>
+            </View>
+            
+            {poll && !resolvedOptionId && (
+              <ProphetPoll />
+            )}
+          </View>
         </Card>
       )}
 
       {/* Pick of the Day */}
       {pickOfDay && (
-        <Card trophy style={{ padding: 12, marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text style={{ color: colors.textHigh, fontWeight: '700' }}>Pick of the Day</Text>
-            <Badge>
-              <Text style={{ color: colors.textMid, fontSize: 12 }}>Streak {podStreak}</Text>
-            </Badge>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={{ color: colors.textMid }}>{pickOfDay.league} • {pickOfDay.game}</Text>
-              <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '700', marginTop: 4 }}>{pickOfDay.player}</Text>
-              <Text style={{ color: colors.textLow, marginTop: 2 }}>Line {pickOfDay.line} • {pickOfDay.prop}</Text>
+        <Card trophy style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
+          <View style={{ padding: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>⭐ Pick of the Day</Text>
+              <Badge color={colors.chip}>
+                <Text style={{ fontSize: 10 }}>⭐ Streak {podStreak}</Text>
+              </Badge>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button variant='mint' onPress={() => handlePodPick('over')} disabled={!!podChoice}>Over</Button>
-              <Button variant='secondary' onPress={() => handlePodPick('under')} disabled={!!podChoice}>Under</Button>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.textMid, fontSize: 14 }}>{pickOfDay.league} • {pickOfDay.game}</Text>
+              <Badge color={colors.chip}>{pickOfDay.prop}</Badge>
             </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <View>
+                <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>{pickOfDay.player}</Text>
+                <Text style={{ color: colors.textLow, fontSize: 12 }}>Line {pickOfDay.line}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button 
+                  disabled={!!podChoice} 
+                  onPress={() => handlePodPick("over")} 
+                  style={{ backgroundColor: colors.mint }}
+                >
+                  <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Over</Text>
+                </Button>
+                <Button 
+                  disabled={!!podChoice} 
+                  onPress={() => handlePodPick("under")} 
+                  variant="secondary"
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600' }}>Under</Text>
+                </Button>
+              </View>
+            </View>
+            
+            {podChoice && (
+              <Text style={{ color: colors.textMid, fontSize: 12 }}>
+                You picked {podChoice.toUpperCase()} {pickOfDay.resolved ? 
+                  (pickOfDay.correct === podChoice ? "• Correct! +12" : "• Missed") : 
+                  "• Resolving..."
+                }
+              </Text>
+            )}
           </View>
-          {podChoice && (
-            <Text style={{ color: colors.textMid, marginTop: 8 }}>
-              You picked {podChoice.toUpperCase()} {pickOfDay.resolved ? (pickOfDay.correct === podChoice ? '• Correct! +12' : '• Missed') : '• Resolving...'}
-            </Text>
-          )}
         </Card>
       )}
 
-      <Text style={{ color: colors.textHigh, fontWeight: '700', marginBottom: 8 }}>Action Channel</Text>
+      {/* Action Channel */}
       <ActionChannel />
+
+      {/* Parlay Builder */}
+      <View style={{ marginTop: spacing(2) }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Build Parlay</Text>
+          <Button 
+            variant="primary" 
+            onPress={() => setShowParlayBuilder(!showParlayBuilder)}
+          >
+            <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
+              {showParlayBuilder ? 'Hide' : 'Show'} Builder
+            </Text>
+          </Button>
+        </View>
+        
+        {showParlayBuilder && (
+          <ParlayBuilder onSubmit={(legs) => {
+            console.log('Parlay submitted:', legs);
+            setShowParlayBuilder(false);
+          }} />
+        )}
+      </View>
+
+      {/* Party Chat */}
+      {currentParty && (
+        <View style={{ marginTop: spacing(2) }}>
+          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 8 }}>Party Chat</Text>
+          <PartyChat partyId={currentParty.id} />
+        </View>
+      )}
     </ScrollView>
   );
 };
