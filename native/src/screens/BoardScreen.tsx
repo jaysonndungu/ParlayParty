@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, Image, Pressable, ScrollView } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
 import { useStore } from '@/store/AppStore';
 import { ProphetPoll } from '@/components/ProphetPoll';
 import { ActionChannel } from '@/components/ActionChannel';
 import { PartyChat } from '@/components/PartyChat';
-import { ParlayBuilder } from '@/components/ParlayBuilder';
+import { BackendTestComponent } from '@/components/BackendTestComponent';
 
 export const BoardScreen: React.FC = () => {
   const { 
@@ -21,10 +22,10 @@ export const BoardScreen: React.FC = () => {
     podStreak,
     handlePodPick,
     partyScores,
-    me
+    me,
+    user,
+    logout
   } = useStore();
-  
-  const [showParlayBuilder, setShowParlayBuilder] = useState(false);
 
   const avatarUrl = (name: string) => {
     const seed = encodeURIComponent(name);
@@ -57,7 +58,8 @@ export const BoardScreen: React.FC = () => {
   const currentPrizePool = currentParty ? partyPrizePools[currentParty.id] || 0 : 0;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.ink }} contentContainerStyle={{ padding: spacing(2) }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(2) }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
         <View style={{ flex: 1 }}>
@@ -70,42 +72,78 @@ export const BoardScreen: React.FC = () => {
             </Text>
           )}
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <Badge color={colors.chip}>Points {currentScores[me] ?? 0}</Badge>
-          {currentParty?.type === 'competitive' && currentPrizePool > 0 && (
-            <Badge color={colors.gold}>Pool ${currentPrizePool}</Badge>
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <Badge color={colors.chip}>Points {currentScores[me] ?? 0}</Badge>
+            {currentParty?.type === 'competitive' && currentPrizePool > 0 && (
+              <Badge color={colors.gold}>Pool ${currentPrizePool}</Badge>
+            )}
+          </View>
+          
+          {user && (
+            <Pressable 
+              onPress={() => {
+                // This would navigate to profile, but for now just show user info
+                Alert.alert('User Info', `Logged in as ${user.username}\nEmail: ${user.email}\nWallet: $${user.walletBalance.toFixed(2)}`);
+              }}
+              style={{ alignItems: 'center' }}
+            >
+              <Image 
+                source={{ uri: avatarUrl(user.fullName) }} 
+                style={{ width: 40, height: 40, borderRadius: 20 }} 
+              />
+              <Text style={{ color: colors.textLow, fontSize: 10, marginTop: 2 }}>
+                {user.username}
+              </Text>
+            </Pressable>
           )}
         </View>
       </View>
 
-      {/* Clutch Time */}
-      {clutch && (
-        <Card trophy style={{ marginBottom: spacing(2), borderColor: colors.primary, borderWidth: 1 }}>
-          <View style={{ padding: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Clutch Time</Text>
+      {/* Clutch Time - Always visible to maintain layout */}
+      <Card trophy style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
+        <View style={{ padding: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>
+              {clutch ? 'Clutch Time' : 'Live Action'}
+            </Text>
+            {clutch && (
               <Button variant="secondary" onPress={() => {/* Dismiss clutch */}}>
                 <Text style={{ fontSize: 12 }}>Dismiss</Text>
               </Button>
-            </View>
-            
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <Image 
-                source={{ uri: avatarUrl(clutch.user) }} 
-                style={{ width: 40, height: 40, borderRadius: 20 }} 
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.textLow, fontSize: 12 }}>{clutch.game} • {clutch.user}</Text>
-                <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '700' }}>{clutch.text}</Text>
-              </View>
-            </View>
-            
-            {poll && !resolvedOptionId && (
-              <ProphetPoll />
             )}
           </View>
-        </Card>
-      )}
+          
+          {clutch ? (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <Image 
+                  source={{ uri: avatarUrl(clutch.user) }} 
+                  style={{ width: 40, height: 40, borderRadius: 20 }} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.textLow, fontSize: 12 }}>{clutch.game} • {clutch.user}</Text>
+                  <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '700' }}>{clutch.text}</Text>
+                </View>
+              </View>
+              
+              {poll && !resolvedOptionId && (
+                <ProphetPoll />
+              )}
+            </>
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: colors.textMid, fontSize: 16, textAlign: 'center' }}>
+                No clutch moments right now
+              </Text>
+              <Text style={{ color: colors.textLow, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+                Stay tuned for exciting plays!
+              </Text>
+            </View>
+          )}
+        </View>
+      </Card>
 
       {/* Pick of the Day */}
       {pickOfDay && (
@@ -161,28 +199,6 @@ export const BoardScreen: React.FC = () => {
       {/* Action Channel */}
       <ActionChannel />
 
-      {/* Parlay Builder */}
-      <View style={{ marginTop: spacing(2) }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Build Parlay</Text>
-          <Button 
-            variant="primary" 
-            onPress={() => setShowParlayBuilder(!showParlayBuilder)}
-          >
-            <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
-              {showParlayBuilder ? 'Hide' : 'Show'} Builder
-            </Text>
-          </Button>
-        </View>
-        
-        {showParlayBuilder && (
-          <ParlayBuilder onSubmit={(legs) => {
-            console.log('Parlay submitted:', legs);
-            setShowParlayBuilder(false);
-          }} />
-        )}
-      </View>
-
       {/* Party Chat */}
       {currentParty && (
         <View style={{ marginTop: spacing(2) }}>
@@ -190,6 +206,10 @@ export const BoardScreen: React.FC = () => {
           <PartyChat partyId={currentParty.id} />
         </View>
       )}
-    </ScrollView>
+
+      {/* Backend Test Component */}
+      <BackendTestComponent />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
