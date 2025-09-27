@@ -1,0 +1,8 @@
+Your Goal: You are building the backend for ParlayParty, a mobile application that makes watching sports more engaging for friend groups. It's a social platform where users can track their parlay bets together in real-time, compete on leaderboards, and predict the outcomes of each other's high-stakes plays. The app should feel dynamic, live, and full of action.
+The Core Concept: The heart of this application is a game simulation engine. Instead of relying on external live sports data feeds, our backend will be responsible for generating its own exciting, realistic game narratives. When a user places a bet on a game, the backend will create a complete, play-by-play story for that game. A background service will then "broadcast" this story over time, updating stats and game events, creating a shared, synchronized experience for every user in a party. This makes the app feel alive and allows us to control the drama, ensuring exciting "Clutch Time" moments.
+Key Feature Areas:
+• Users & Identity: A system for user accounts and profiles.
+• Parties: Social groups where users can share their parlays.
+• Imported Parlays: Integration with sportsbook to display users' parlays
+• Live Experience: The real-time feed and game simulation.
+• Scoring & Leaderboards: The system for points and competition.
