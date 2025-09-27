@@ -1,0 +1,125 @@
+/* Updated: 2025-09-27T21:32:12.857Z */
+/* Updated: 2025-09-27T19:01:36.327Z */
+/* Updated: 2025-09-27T19:01:31.525Z */
+/* Updated: 2025-09-27T18:05:44.472Z */
+/* Updated: 2025-09-27T18:05:30.891Z */
+/* Updated: 2025-09-27T15:34:37.465Z */
+/* Updated: 2025-09-27T05:31:31.423Z */
+/* Updated: 2025-09-27T04:40:46.938Z */
+/* Updated: 2025-09-27T03:38:54.576Z */
+/* Updated: 2025-09-27T03:19:44.594Z */
+/* Updated: 2025-09-27T03:09:10.871Z */
+/* Updated: 2025-09-27T03:20:00Z */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-display: "Outfit", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Semantic colors map to palette variables */
+  --color-background: var(--ink-950);
+  --color-foreground: var(--text-high);
+  --color-card: var(--slate-900);
+  --color-card-foreground: var(--text-high);
+  --color-popover: var(--slate-900);
+  --color-popover-foreground: var(--text-high);
+  --color-primary: var(--pp-purple);
+  --color-primary-foreground: black;
+  --color-secondary: var(--neutral-chip);
+  --color-secondary-foreground: var(--text-high);
+  --color-muted: var(--steel-700);
+  --color-muted-foreground: var(--text-mid);
+  --color-accent: var(--pp-purple);
+  --color-accent-foreground: black;
+  --color-destructive: var(--error);
+  --color-border: var(--steel-700);
+  --color-input: var(--steel-700);
+  --color-ring: var(--pp-purple);
+  --color-chart-1: var(--pp-purple);
+  --color-chart-2: var(--gold);
+  --color-chart-3: var(--mint);
+  --color-chart-4: var(--info);
+  --color-chart-5: var(--warning);
+
+  --color-sidebar: var(--slate-900);
+  --color-sidebar-foreground: var(--text-high);
+  --color-sidebar-primary: var(--pp-purple);
+  --color-sidebar-primary-foreground: black;
+  --color-sidebar-accent: var(--neutral-chip);
+  --color-sidebar-accent-foreground: var(--text-high);
+  --color-sidebar-border: var(--steel-700);
+  --color-sidebar-ring: var(--pp-purple);
+}
+
+:root {
+  /* Core Palette */
+  --ink-950: #0E0F13;
+  --slate-900: #171A21;
+  --steel-700: #262B36;
+
+  --text-high: #E8ECF4;
+  --text-mid: #A4AEC0;
+  --text-low: #6B7382;
+
+  /* Remap brand to RED palette */
+  --pp-purple: #FF2E63; /* primary red 500 */
+  --brand-red-300: #FF6B8F; /* subtle accents/gradients */
+  --brand-red-400: #FF4A78; /* hovers/secondary accents */
+  --brand-red-500: #FF2E63; /* primary */
+  --brand-red-600: #E11E56; /* pressed */
+  --brand-red-700: #B21C45; /* outlines on dark */
+
+  --mint: #22C55E;
+  --gold: #F6C945;
+  --warning: #FFB020;
+  --error: #FF4E6D;
+  --info: #40B3FF;
+  --neutral-chip: #2E3442;
+
+  /* Gradients - repurpose purple gradient tokens to red gradient */
+  --purple-grad-start: #FF2E63;
+  --purple-grad-end: #FF6B8F;
+
+  /* Focus glow */
+  --focus-glow: rgba(255, 46, 99, 0.32);
+}
+
+.dark {
+  /* Same variables apply in dark; palette already dark-native */
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+
+  /* Trophy Edge utility: subtle gold lip for premium cards */
+  .trophy-edge { position: relative; }
+  .trophy-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), color-mix(in oklab, var(--gold) 0%, transparent));
+    opacity: 0.9;
+  }
+
+  /* Hide Next.js error overlay portal */
+  nextjs-portal { display: none !important; }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "expo-shim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local shim that no-ops the expo CLI to avoid interfering with Next dev server",
+  "bin": {
+    "expo": "bin/expo.js"
+  }
+}
