@@ -29,7 +29,7 @@ export const PartiesScreen: React.FC = () => {
   const [newPartyStart, setNewPartyStart] = useState('');
   const [newPartyEnd, setNewPartyEnd] = useState('');
   const [newBuyIn, setNewBuyIn] = useState<string>('');
-  const [newAllowedSports, setNewAllowedSports] = useState<string[]>(['NFL', 'NBA']);
+  // Removed sports selector - using default sports
   const [newEvalLimit, setNewEvalLimit] = useState<string>('5');
   const [addFundsAmt, setAddFundsAmt] = useState<string>('');
   const [withdrawAmt, setWithdrawAmt] = useState<string>('');
@@ -42,7 +42,7 @@ export const PartiesScreen: React.FC = () => {
   const [buyInConfirmed, setBuyInConfirmed] = useState<boolean>(false);
   const [tempBuyIn, setTempBuyIn] = useState<string>('');
 
-  const ALL_SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'] as const;
+  // Removed sports selector - using default sports
 
   const formatDate = (date: Date) => {
     return date.toISOString().slice(0, 10);
@@ -64,7 +64,7 @@ export const PartiesScreen: React.FC = () => {
     setBuyInConfirmed(false);
   };
 
-  const handleCreateParty = () => {
+  const handleCreateParty = async () => {
     setDateError('');
     setCreateError('');
     
@@ -85,37 +85,41 @@ export const PartiesScreen: React.FC = () => {
         setCreateError('Enter a valid buy-in amount');
         return;
       }
-      if (!newAllowedSports.length) {
-        setCreateError('Select at least one allowed sport');
-        return;
-      }
+      // Using default sports - no validation needed
       if (wallet < buyIn) {
         setCreateError('Insufficient funds in wallet for buy-in');
         return;
       }
     }
 
-    createParty(
-      newPartyName,
-      newPartyType,
-      newPartyStart,
-      newPartyEnd,
-      newPartyType === 'competitive' ? parseFloat(newBuyIn) : undefined,
-      newAllowedSports,
-      parseInt(newEvalLimit)
-    );
-    
-    // Generate invite code for display
-    const generatedInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setInviteCode(generatedInviteCode);
-    setCreatedParty({
-      name: newPartyName.trim() || (newPartyType === 'friendly' ? 'Friendly Party' : 'Competitive Party'),
-      type: newPartyType,
-      joinCode: generatedInviteCode,
-      maxParticipants: 16,
-      currentParticipants: 1
-    });
-    setShowInviteCode(true);
+    try {
+      const result = await createParty(
+        newPartyName,
+        newPartyType,
+        newPartyStart,
+        newPartyEnd,
+        newPartyType === 'competitive' ? parseFloat(newBuyIn) : undefined,
+        ['NFL', 'NBA'], // Default sports
+        parseInt(newEvalLimit)
+      );
+      
+      if (result) {
+        // Use the actual joinCode from the API
+        setInviteCode(result.joinCode);
+        setCreatedParty({
+          name: newPartyName.trim() || (newPartyType === 'friendly' ? 'Friendly Party' : 'Competitive Party'),
+          type: newPartyType,
+          joinCode: result.joinCode,
+          maxParticipants: 16,
+          currentParticipants: 1
+        });
+        setShowInviteCode(true);
+      } else {
+        setCreateError('Failed to create party');
+      }
+    } catch (error) {
+      setCreateError('Failed to create party');
+    }
     
     setOpen(false);
     setNewPartyName('');
@@ -123,7 +127,7 @@ export const PartiesScreen: React.FC = () => {
     setNewPartyStart('');
     setNewPartyEnd('');
     setNewBuyIn('');
-    setNewAllowedSports(['NFL', 'NBA']);
+    // Removed sports selector
     setNewEvalLimit('5');
     setBuyInConfirmed(false);
     setTempBuyIn('');
@@ -188,13 +192,7 @@ export const PartiesScreen: React.FC = () => {
     setWithdrawAmt('');
   };
 
-  const toggleSport = (sport: string) => {
-    setNewAllowedSports(prev => 
-      prev.includes(sport) 
-        ? prev.filter(s => s !== sport)
-        : [...prev, sport]
-    );
-  };
+  // Removed sports selector
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
@@ -504,21 +502,7 @@ export const PartiesScreen: React.FC = () => {
                         )}
                       </View>
                       
-                      <View style={{ marginBottom: 8 }}>
-                        <Text style={{ color: colors.textMid, fontSize: 12, marginBottom: 4 }}>Allowed Sports</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                          {ALL_SPORTS.map(sport => (
-                            <Button
-                              key={sport}
-                              variant={newAllowedSports.includes(sport) ? 'primary' : 'secondary'}
-                              onPress={() => toggleSport(sport)}
-                              style={{ minWidth: 60 }}
-                            >
-                              <Text style={{ fontSize: 10, fontWeight: '600' }}>{sport}</Text>
-                            </Button>
-                          ))}
-                        </View>
-                      </View>
+                      {/* Removed sports selector - using default sports */}
                     </View>
                   )}
 

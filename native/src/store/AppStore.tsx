@@ -90,7 +90,7 @@ interface StoreState {
   now: number;
   
   // Actions
-  createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => Promise<void>;
+  createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => Promise<{ joinCode: string; partyId: string } | null>;
   joinParty: (code: string, buyIn?: number) => Promise<void>;
   selectParty: (id: string) => void;
   submitVote: (opts: { id: string; label: string; partyName: string; choice: 'hit' | 'chalk'; isClutch?: boolean }) => void;
@@ -360,12 +360,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
         
         setSelectedPartyId(party.id);
+        
+        // Return the actual joinCode from the API
+        return { joinCode, partyId: party.id };
       } else {
         throw new Error('Failed to create party');
       }
     } catch (error) {
       console.error('Create party error:', error);
       setPartyError(error instanceof Error ? error.message : 'Failed to create party');
+      return null;
     } finally {
       setPartyLoading(false);
     }
