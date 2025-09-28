@@ -319,6 +319,34 @@ export const supabaseAPI = {
     };
   },
 
+  // Delete a party (only by creator)
+  async deleteParty(partyId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // First check if user is the creator
+    const { data: party, error: partyError } = await supabase
+      .from('parties')
+      .select('creator_id')
+      .eq('id', partyId)
+      .single();
+
+    if (partyError) throw partyError;
+    if (party.creator_id !== user.id) {
+      throw new Error('Only the party creator can delete the party');
+    }
+
+    // Delete the party (cascade will handle party_members and party_chat_messages)
+    const { error: deleteError } = await supabase
+      .from('parties')
+      .delete()
+      .eq('id', partyId);
+
+    if (deleteError) throw deleteError;
+
+    return { success: true };
+  },
+
   async joinParty(joinData: {
     joinCode: string;
     username: string;

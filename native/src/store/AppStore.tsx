@@ -92,6 +92,7 @@ interface StoreState {
   // Actions
   createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => Promise<{ joinCode: string; partyId: string } | null>;
   joinParty: (code: string, buyIn?: number) => Promise<void>;
+  deleteParty: (partyId: string) => Promise<void>;
   selectParty: (id: string) => void;
   submitVote: (opts: { id: string; label: string; partyName: string; choice: 'hit' | 'chalk'; isClutch?: boolean }) => void;
   votePoll: (optionId: string) => void;
@@ -417,6 +418,59 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user, loadPartiesFromSupabase]);
 
+  const deleteParty = useCallback(async (partyId: string) => {
+    setPartyLoading(true);
+    setPartyError(null);
+    
+    try {
+      await supabaseAPI.deleteParty(partyId);
+      
+      // Refresh parties from Supabase
+      await loadPartiesFromSupabase();
+      
+      // If the deleted party was selected, clear selection
+      if (selectedPartyId === partyId) {
+        setSelectedPartyId(null);
+        setEvents([]);
+        setClutch(null);
+        setPoll(null);
+        setResolvedOptionId(null);
+      }
+      
+      // Clean up party-specific state
+      setPartyScores((m) => {
+        const newScores = { ...m };
+        delete newScores[partyId];
+        return newScores;
+      });
+      setPartyPrizePools((m) => {
+        const newPools = { ...m };
+        delete newPools[partyId];
+        return newPools;
+      });
+      setPartyBuyIns((m) => {
+        const newBuyIns = { ...m };
+        delete newBuyIns[partyId];
+        return newBuyIns;
+      });
+      setPartyAllowedSports((m) => {
+        const newSports = { ...m };
+        delete newSports[partyId];
+        return newSports;
+      });
+      setEvalSettings((m) => {
+        const newSettings = { ...m };
+        delete newSettings[partyId];
+        return newSettings;
+      });
+    } catch (error) {
+      console.error('Delete party error:', error);
+      setPartyError(error instanceof Error ? error.message : 'Failed to delete party');
+    } finally {
+      setPartyLoading(false);
+    }
+  }, [selectedPartyId, loadPartiesFromSupabase]);
+
   const selectParty = useCallback((id: string) => {
     setSelectedPartyId(id);
     setEvents([]);
@@ -709,7 +763,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     me, myParties, selectedPartyId, currentParty, partyScores, partyPrizePools, partyPicks, 
     partyBuyIns, partyAllowedSports, evalSettings, wallet, events, clutch, clutchStream, 
     poll, resolvedOptionId, myPolls, pickOfDay, podChoice, podStreak, myParlayOfDay, 
-    friendParlayOfDay, profilePhotoUrl, connections, now, createParty, joinParty, selectParty, 
+    friendParlayOfDay, profilePhotoUrl, connections, now, createParty, joinParty, deleteParty, selectParty, 
     submitVote, votePoll, handlePodPick, addFunds, withdrawFunds, setProfilePhotoUrl, 
     setConnections, addChatMessage, getChatMessages,
     // Authentication method dependencies

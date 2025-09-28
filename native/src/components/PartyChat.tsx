@@ -34,15 +34,6 @@ export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
     loadMessages();
   }, [partyId]);
 
-  // Refresh messages when component becomes visible
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadMessages();
-    }, 2000); // Refresh every 2 seconds as fallback
-
-    return () => clearInterval(interval);
-  }, [partyId]);
-
   // Set up real-time subscription
   useEffect(() => {
     if (partyId) {

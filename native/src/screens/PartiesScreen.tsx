@@ -13,9 +13,11 @@ export const PartiesScreen: React.FC = () => {
     selectParty, 
     createParty, 
     joinParty,
+    deleteParty,
     wallet,
     addFunds,
-    withdrawFunds
+    withdrawFunds,
+    user
   } = useStore();
   
   const [open, setOpen] = useState(false);
@@ -193,6 +195,28 @@ export const PartiesScreen: React.FC = () => {
   };
 
   // Removed sports selector
+
+  const handleDeleteParty = async (partyId: string, partyName: string) => {
+    Alert.alert(
+      'Delete Party',
+      `Are you sure you want to delete "${partyName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteParty(partyId);
+              Alert.alert('Success', 'Party deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete party');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
@@ -386,6 +410,16 @@ export const PartiesScreen: React.FC = () => {
                         {item.id === selectedPartyId ? 'Current' : 'Open'}
                       </Text>
                     </Button>
+                    {/* Delete button - only show for party creator */}
+                    {user && item.createdBy === user.id && (
+                      <Button 
+                        onPress={() => handleDeleteParty(item.id, item.name)} 
+                        variant="secondary"
+                        style={{ backgroundColor: colors.error }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink }}>🗑️</Text>
+                      </Button>
+                    )}
                   </View>
                 </View>
               </View>
