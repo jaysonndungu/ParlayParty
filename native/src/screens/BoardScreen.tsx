@@ -31,7 +31,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
     logout
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<'live' | 'parlays'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'parlays' | 'chat'>('live');
   const [selectedGame, setSelectedGame] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [showGameDropdown, setShowGameDropdown] = useState(false);
@@ -213,10 +213,10 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
                 borderColor: event.isClutch ? colors.gold : colors.steel,
                 borderWidth: 1
               }}>
-                <View style={{ padding: 16 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <View style={{ padding: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Text style={{ color: colors.textLow, fontSize: 12 }}>{event.game} • {event.user}</Text>
-                  </View>
+          </View>
           
                   <Text style={{ 
                     color: event.isClutch ? '#000' : colors.textHigh, 
@@ -779,32 +779,58 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
             All Parlays
           </Text>
         </Pressable>
+
+        {/* Chat Tab */}
+        <Pressable
+          style={{
+            flex: 1,
+            padding: spacing(1.5),
+            backgroundColor: activeTab === 'chat' ? colors.slate : 'transparent',
+            borderRadius: 8,
+            borderWidth: activeTab === 'chat' ? 1 : 0,
+            borderColor: activeTab === 'chat' ? colors.steel : 'transparent'
+          }}
+          onPress={() => setActiveTab('chat')}
+        >
+          <Text style={{ 
+            color: activeTab === 'chat' ? colors.textHigh : colors.textMid, 
+            fontSize: 14, 
+            fontWeight: '600',
+            textAlign: 'center'
+          }}>
+            Chat
+          </Text>
+        </Pressable>
       </View>
 
       {/* Content */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(2) }}>
-        {activeTab === 'live' ? (
-          <>
-            {renderClutchTimeSection()}
-            {renderPickOfDay()}
-            {renderParlayOfDay()}
-            {renderLiveLegs()}
-
-      {/* Party Chat */}
-      {currentParty && (
-        <View style={{ marginTop: spacing(2) }}>
-          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 8 }}>Party Chat</Text>
-          <PartyChat partyId={currentParty.id} />
-        </View>
-      )}
-          </>
+      {activeTab === 'chat' ? (
+        currentParty ? (
+          <PartyChat partyId={currentParty.id} partyName={currentParty.name} />
         ) : (
-          <>
-            {renderAllParlays()}
-            <ActionChannel />
-          </>
-        )}
-      </ScrollView>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing(4) }}>
+            <Text style={{ color: colors.textMid, fontSize: 16, textAlign: 'center' }}>
+              Join a party to start chatting! 🎉
+            </Text>
+          </View>
+        )
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(2) }}>
+          {activeTab === 'live' ? (
+            <>
+              {renderClutchTimeSection()}
+              {renderPickOfDay()}
+              {renderParlayOfDay()}
+              {renderLiveLegs()}
+            </>
+          ) : (
+            <>
+              {renderAllParlays()}
+              <ActionChannel />
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };

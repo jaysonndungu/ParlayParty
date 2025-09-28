@@ -1,125 +1,218 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Image, Pressable } from 'react-native';
-import { useStore, ChatMessage } from '@/store/AppStore';
-import { colors } from '@/theme/tokens';
-import { Button } from '@/components/ui';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { colors, spacing } from '@/theme/tokens';
+import { chatAPI, ChatMessageWithId } from '@/services/chatAPI';
+import { ChatMessage } from './ChatMessage';
+import { useStore } from '@/store/AppStore';
 
 interface PartyChatProps {
   partyId: string;
+  partyName: string;
 }
 
-export const PartyChat: React.FC<PartyChatProps> = ({ partyId }) => {
-  const { me, getChatMessages, addChatMessage } = useStore();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState('');
+export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
+  const { user } = useStore();
+  const [messages, setMessages] = useState<ChatMessageWithId[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const subscriptionRef = useRef<any>(null);
 
+  // Load initial messages
   useEffect(() => {
-    const loadMessages = async () => {
-      const loadedMessages = await getChatMessages(partyId);
-      setMessages(loadedMessages);
-    };
     loadMessages();
-  }, [partyId, getChatMessages]);
+  }, [partyId]);
 
-  const send = () => {
-    const t = text.trim();
-    if (!t) return;
-    const msg: ChatMessage = { 
-      id: Math.random().toString(36).slice(2), 
-      user: me, 
-      text: t, 
-      ts: Date.now() 
+  // Set up real-time subscription
+  useEffect(() => {
+    if (partyId) {
+      subscriptionRef.current = chatAPI.subscribeToPartyChat(partyId, (message) => {
+        setMessages(prev => [...prev, message]);
+        // Auto-scroll to bottom when new message arrives
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      });
+    }
+
+    return () => {
+      if (subscriptionRef.current) {
+        chatAPI.unsubscribeFromPartyChat(subscriptionRef.current);
+      }
     };
-    setMessages((arr) => [...arr, msg]);
-    addChatMessage(partyId, msg);
-    setText('');
+  }, [partyId]);
+
+  const loadMessages = async () => {
+    try {
+      setIsLoading(true);
+      const fetchedMessages = await chatAPI.getPartyMessages(partyId);
+      setMessages(fetchedMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load chat messages');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const avatarUrl = (name: string) => {
-    const seed = encodeURIComponent(name);
-    return `https://api.dicebear.com/7.x/thumbs/svg?seed=${seed}&backgroundType=gradientLinear,gradientRadial&shapeColor=6f4df8,8b5cf6,22c55e,F6C945`;
+  const sendMessage = async () => {
+    if (!newMessage.trim() || isSending) return;
+
+    try {
+      setIsSending(true);
+      await chatAPI.sendMessage(partyId, newMessage.trim());
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
   };
+
+  const renderMessage = (message: ChatMessageWithId) => {
+    const isOwnMessage = message.user_id === user?.id;
+    
+    return (
+      <ChatMessage
+        key={message.id}
+        message={message}
+        isOwnMessage={isOwnMessage}
+        onLongPress={(msg) => {
+          // Handle long press for message options (edit, delete, etc.)
+          console.log('Long press on message:', msg.id);
+        }}
+      />
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.ink,
+      }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textMid, marginTop: spacing(1) }}>
+          Loading chat...
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ 
-      height: 400, 
-      borderRadius: 12, 
-      borderWidth: 1, 
-      borderColor: colors.steel, 
-      backgroundColor: colors.slate,
-      overflow: 'hidden'
-    }}>
-      {/* Header */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 8, 
-        padding: 12, 
-        borderBottomWidth: 1, 
-        borderBottomColor: colors.steel 
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.ink }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      {/* Chat Header */}
+      <View style={{
+        padding: spacing(2),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.steel,
+        backgroundColor: colors.ink,
       }}>
-        <Text style={{ color: colors.textHigh, fontSize: 14, fontWeight: '600' }}># general</Text>
-        <Text style={{ color: colors.textMid, fontSize: 12 }}>Party chat</Text>
+        <Text style={{
+          color: colors.textHigh,
+          fontSize: 18,
+          fontWeight: '700',
+          textAlign: 'center',
+        }}>
+          {partyName} Chat
+        </Text>
       </View>
-      
+
       {/* Messages */}
-      <View style={{ flex: 1, padding: 12 }}>
-        {messages.map((item) => (
-          <View key={item.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-            <Image 
-              source={{ uri: avatarUrl(item.user) }} 
-              style={{ width: 32, height: 32, borderRadius: 16 }} 
-            />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Text style={{ color: colors.textHigh, fontSize: 14, fontWeight: '600' }}>{item.user}</Text>
-                <Text style={{ color: colors.textLow, fontSize: 10 }}>
-                  {new Date(item.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-              <View style={{ 
-                backgroundColor: colors.chip, 
-                padding: 8, 
-                borderRadius: 8, 
-                borderWidth: 1, 
-                borderColor: colors.steel 
-              }}>
-                <Text style={{ color: colors.textHigh, fontSize: 14 }}>{item.text}</Text>
-              </View>
-            </View>
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1, padding: spacing(1) }}
+        contentContainerStyle={{ paddingBottom: spacing(2) }}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        {messages.length === 0 ? (
+          <View style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: spacing(4),
+          }}>
+            <Text style={{
+              color: colors.textMid,
+              fontSize: 16,
+              textAlign: 'center',
+            }}>
+              No messages yet. Start the conversation! 🎉
+            </Text>
           </View>
-        ))}
-      </View>
-      
-      {/* Input */}
-      <View style={{ 
-        borderTopWidth: 1, 
-        borderTopColor: colors.steel, 
-        padding: 8, 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 8 
+        ) : (
+          messages.map(renderMessage)
+        )}
+      </ScrollView>
+
+      {/* Message Input */}
+      <View style={{
+        flexDirection: 'row',
+        padding: spacing(2),
+        borderTopWidth: 1,
+        borderTopColor: colors.steel,
+        backgroundColor: colors.ink,
+        alignItems: 'flex-end',
       }}>
         <TextInput
-          placeholder="Message #general"
-          placeholderTextColor={colors.textLow}
-          value={text}
-          onChangeText={setText}
-          onSubmitEditing={send}
-          style={{ 
-            flex: 1, 
-            color: colors.textHigh, 
-            borderWidth: 1, 
-            borderColor: colors.steel, 
-            borderRadius: 8, 
-            padding: 8,
-            backgroundColor: colors.chip
+          style={{
+            flex: 1,
+            backgroundColor: colors.steel,
+            borderRadius: 20,
+            paddingHorizontal: spacing(2),
+            paddingVertical: spacing(1.5),
+            color: colors.textHigh,
+            fontSize: 16,
+            maxHeight: 100,
           }}
+          placeholder="Type a message..."
+          placeholderTextColor={colors.textMid}
+          value={newMessage}
+          onChangeText={setNewMessage}
+          multiline
+          maxLength={500}
         />
-        <Button variant="primary" onPress={send}>
-          <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Send</Text>
-        </Button>
+        <TouchableOpacity
+          style={{
+            marginLeft: spacing(1),
+            backgroundColor: colors.primary,
+            borderRadius: 20,
+            padding: spacing(1.5),
+            opacity: (!newMessage.trim() || isSending) ? 0.5 : 1,
+          }}
+          onPress={sendMessage}
+          disabled={!newMessage.trim() || isSending}
+        >
+          {isSending ? (
+            <ActivityIndicator size="small" color={colors.textHigh} />
+          ) : (
+            <Text style={{
+              color: colors.textHigh,
+              fontWeight: '600',
+              fontSize: 16,
+            }}>
+              Send
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };

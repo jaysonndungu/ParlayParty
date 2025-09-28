@@ -368,15 +368,27 @@ export const PartiesScreen: React.FC = () => {
                 
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Badge color={colors.chip}>{item.type}</Badge>
-                  <Button 
-                    onPress={() => selectParty(item.id)} 
-                    disabled={item.id === selectedPartyId}
-                    variant={item.id === selectedPartyId ? "secondary" : "primary"}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '600' }}>
-                      {item.id === selectedPartyId ? 'Current' : 'Open'}
-                    </Text>
-                  </Button>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Button 
+                      onPress={() => {
+                        selectParty(item.id);
+                        // Navigate to chat tab - this would need to be handled by parent component
+                        // For now, we'll just select the party and user can manually go to chat
+                      }}
+                      variant="secondary"
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600' }}>💬 Chat</Text>
+                    </Button>
+                    <Button 
+                      onPress={() => selectParty(item.id)} 
+                      disabled={item.id === selectedPartyId}
+                      variant={item.id === selectedPartyId ? "secondary" : "primary"}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600' }}>
+                        {item.id === selectedPartyId ? 'Current' : 'Open'}
+                      </Text>
+                    </Button>
+                  </View>
                 </View>
               </View>
             </Card>

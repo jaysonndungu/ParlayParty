@@ -120,6 +120,48 @@ export interface Database {
           buy_in_paid?: number | null;
         };
       };
+      party_chat_messages: {
+        Row: {
+          id: string;
+          party_id: string;
+          user_id: string;
+          message: string;
+          message_type: 'text' | 'system' | 'celebration';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          party_id: string;
+          user_id: string;
+          message: string;
+          message_type?: 'text' | 'system' | 'celebration';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          message?: string;
+          message_type?: 'text' | 'system' | 'celebration';
+          updated_at?: string;
+        };
+      };
+    };
+    Views: {
+      party_chat_with_users: {
+        Row: {
+          id: string;
+          party_id: string;
+          user_id: string;
+          message: string;
+          message_type: 'text' | 'system' | 'celebration';
+          created_at: string;
+          updated_at: string;
+          username: string;
+          full_name: string;
+          profile_picture_url: string | null;
+        };
+      };
     };
   };
 }
