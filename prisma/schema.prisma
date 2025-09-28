@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  username          String   @unique
+  fullName          String
+  walletBalance     Float    @default(1000)
+  profilePictureUrl String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
+
+  // Relations
+  createdParties    Party[]      @relation("PartyCreator")
+  partyMemberships  PartyMember[]
+
+  @@map("users")
+}
+
+model Party {
+  id                String   @id @default(cuid())
+  name              String
+  type              PartyType
+  creatorId         String
+  startDate         DateTime
+  endDate           DateTime
+  buyInAmount       Float    @default(0)
+  prizePool         Float    @default(0)
+  allowedSports     String[] @default(["NFL", "NBA"])
+  maxMembers        Int      @default(16)
+  currentParticipants Int    @default(1)
+  joinCode          String   @unique
+  description       String?
+  isPrivate         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  creator           User         @relation("PartyCreator", fields: [creatorId], references: [id])
+  members           PartyMember[]
+
+  @@map("parties")
+}
+
+model PartyMember {
+  id        String   @id @default(cuid())
+  partyId   String
+  userId    String
+  joinedAt  DateTime @default(now())
+  isCreator Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  buyInPaid Float?
+
+  // Relations
+  party     Party    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([partyId, userId])
+  @@map("party_members")
+}
+
+enum PartyType {
+  FRIENDLY
+  COMPETITIVE
+}
