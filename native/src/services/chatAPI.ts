@@ -67,6 +67,8 @@ export const chatAPI = {
 
   // Subscribe to real-time chat messages for a party
   subscribeToPartyChat(partyId: string, onMessage: (message: ChatMessageWithId) => void) {
+    console.log('Setting up real-time subscription for party:', partyId);
+    
     const subscription = supabase
       .channel(`party_chat_${partyId}`)
       .on(
@@ -78,6 +80,7 @@ export const chatAPI = {
           filter: `party_id=eq.${partyId}`,
         },
         async (payload) => {
+          console.log('New message received:', payload);
           // Fetch the full message with user details
           const { data, error } = await supabase
             .from('party_chat_with_users')
@@ -86,11 +89,16 @@ export const chatAPI = {
             .single();
 
           if (!error && data) {
+            console.log('Message data:', data);
             onMessage(data as ChatMessageWithId);
+          } else {
+            console.error('Error fetching message details:', error);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
 
     return subscription;
   },

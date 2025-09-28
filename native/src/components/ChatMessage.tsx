@@ -108,7 +108,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     <View style={messageStyle}>
       {message.message_type !== 'system' && (
         <Text style={usernameStyle}>
-          {message.username}
+          {message.full_name || message.username}
         </Text>
       )}
       <Text style={textStyle}>{message.message}</Text>

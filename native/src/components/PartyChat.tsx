@@ -37,8 +37,19 @@ export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
   // Set up real-time subscription
   useEffect(() => {
     if (partyId) {
+      console.log('Setting up chat subscription for party:', partyId);
       subscriptionRef.current = chatAPI.subscribeToPartyChat(partyId, (message) => {
-        setMessages(prev => [...prev, message]);
+        console.log('Received new message in PartyChat:', message);
+        setMessages(prev => {
+          // Check if message already exists to avoid duplicates
+          const exists = prev.some(m => m.id === message.id);
+          if (exists) {
+            console.log('Message already exists, skipping');
+            return prev;
+          }
+          console.log('Adding new message to state');
+          return [...prev, message];
+        });
         // Auto-scroll to bottom when new message arrives
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -48,6 +59,7 @@ export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
 
     return () => {
       if (subscriptionRef.current) {
+        console.log('Cleaning up chat subscription');
         chatAPI.unsubscribeFromPartyChat(subscriptionRef.current);
       }
     };
