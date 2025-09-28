@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView } from 'react-native';
+import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
+import { ConnectedAccountsModal } from '@/components/ConnectedAccountsModal';
 import { useStore } from '@/store/AppStore';
 
 export const PartiesScreen: React.FC = () => {
@@ -35,6 +36,7 @@ export const PartiesScreen: React.FC = () => {
   const [walletError, setWalletError] = useState<string>('');
   const [dateError, setDateError] = useState<string>('');
   const [createError, setCreateError] = useState<string>('');
+  const [accountsModalVisible, setAccountsModalVisible] = useState<boolean>(false);
 
   const ALL_SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'] as const;
 
@@ -166,9 +168,31 @@ export const PartiesScreen: React.FC = () => {
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
         <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700' }}>Your Parties</Text>
-        <Button variant='primary' onPress={() => setOpen(true)}>
-          <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
-        </Button>
+        
+        {/* Only show Connected Sportsbooks button if user is logged in */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setAccountsModalVisible(true)}
+            style={{
+              backgroundColor: 'transparent',
+              paddingHorizontal: spacing(1),
+              paddingVertical: spacing(1),
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.primary,
+              marginRight: spacing(1),
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600', textAlign: 'center', lineHeight: 14 }}>
+              Connect{'\n'}Sportsbooks
+            </Text>
+          </TouchableOpacity>
+          <Button variant='primary' onPress={() => setOpen(true)}>
+            <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
+          </Button>
+        </View>
       </View>
 
       {/* Wallet */}
@@ -546,7 +570,13 @@ export const PartiesScreen: React.FC = () => {
             )}
           </Pressable>
         </Pressable>
-      </Modal>
+        </Modal>
+
+        {/* Connected Accounts Modal */}
+        <ConnectedAccountsModal
+          visible={accountsModalVisible}
+          onClose={() => setAccountsModalVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );
