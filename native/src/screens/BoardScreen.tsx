@@ -383,64 +383,6 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         </View>
   );
 
-  const renderPickOfDay = () => (
-    <Card style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
-          <View style={{ padding: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>⭐ Pick of the Day</Text>
-              <Badge color={colors.chip}>
-                <Text style={{ fontSize: 10 }}>⭐ Streak {podStreak}</Text>
-              </Badge>
-            </View>
-            
-        {pickOfDay ? (
-          <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ color: colors.textMid, fontSize: 14 }}>{pickOfDay.league} • {pickOfDay.game}</Text>
-              <Badge color={colors.chip}>{pickOfDay.prop}</Badge>
-            </View>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View>
-                <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>{pickOfDay.player}</Text>
-                <Text style={{ color: colors.textLow, fontSize: 12 }}>Line {pickOfDay.line}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button 
-                  disabled={!!podChoice} 
-                  onPress={() => handlePodPick("over")} 
-                  style={{ backgroundColor: colors.mint }}
-                >
-                  <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Over</Text>
-                </Button>
-                <Button 
-                  disabled={!!podChoice} 
-                  onPress={() => handlePodPick("under")} 
-                  variant="secondary"
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '600' }}>Under</Text>
-                </Button>
-              </View>
-            </View>
-            
-            {podChoice && (
-              <Text style={{ color: colors.textMid, fontSize: 12 }}>
-                You picked {podChoice.toUpperCase()} {pickOfDay.resolved ? 
-                  (pickOfDay.correct === podChoice ? "• Correct! +12" : "• Missed") : 
-                  "• Resolving..."
-                }
-              </Text>
-            )}
-          </>
-        ) : (
-          <Text style={{ color: colors.textMid, fontSize: 14, textAlign: 'center' }}>
-            No pick of the day available
-          </Text>
-        )}
-      </View>
-    </Card>
-  );
-
   const renderParlayOfDay = () => (
     <Card style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
       <View style={{ padding: 16 }}>
@@ -837,7 +779,6 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ alignItems: 'flex-end', gap: 4 }}>
-            <Badge color={colors.chip}>Points {currentScores[me] ?? 0}</Badge>
             {currentParty?.type === 'competitive' && currentPrizePool > 0 && (
               <Badge color={colors.gold}>Pool ${currentPrizePool}</Badge>
             )}
@@ -954,7 +895,6 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           {activeTab === 'live' ? (
             <>
               {renderClutchTimeSection()}
-              {renderPickOfDay()}
               {renderParlayOfDay()}
               {renderLiveLegs()}
             </>

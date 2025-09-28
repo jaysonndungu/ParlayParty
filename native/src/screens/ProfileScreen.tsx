@@ -154,11 +154,6 @@ export const ProfileScreen: React.FC = () => {
   const cashedPolls = myPolls.filter(p => p.status === 'CASH').length;
   const hitRate = totalPolls > 0 ? Math.round((hitPolls / totalPolls) * 100) : 0;
   const cashRate = totalPolls > 0 ? Math.round((cashedPolls / totalPolls) * 100) : 0;
-  
-  // Calculate total points across all parties
-  const totalPoints = Object.values(partyScores).reduce((total, partyScore) => {
-    return total + (partyScore[user?.id || ''] || 0);
-  }, 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
@@ -197,20 +192,20 @@ export const ProfileScreen: React.FC = () => {
           </Text>
 
           <View style={{ gap: 8 }}>
+            <Badge color={colors.mint}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
+                Points: 167
+              </Text>
+            </Badge>
+            
             <Badge color={colors.gold}>
-              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
                 Wallet: ${user.walletBalance.toFixed(2)}
               </Text>
             </Badge>
             
-            <Badge color={colors.mint}>
-              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
-                Points: {totalPoints}
-              </Text>
-            </Badge>
-            
             <Badge color={colors.primary}>
-              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
                 Member Since: {new Date().toLocaleDateString()}
               </Text>
             </Badge>

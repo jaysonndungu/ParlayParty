@@ -165,7 +165,64 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [clutchTriggered, setClutchTriggered] = useState<{ A: boolean; B: boolean }>({ A: false, B: false });
   // One-time guards to avoid duplicate clutch triggers per prop per simulation run
   const clutchFiredRef = React.useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
-  const [pickOfDay, setPickOfDay] = useState<PickOfDay>(null);
+  const [pickOfDay, setPickOfDay] = useState<PickOfDay>(() => {
+    // Generate random Pick of the Day using existing templates
+    const games = ['PHI @ DAL', 'KC @ BUF', 'SF @ DAL', 'MIA @ NE', 'LAL @ DEN', 'BOS @ MIA'];
+    const players = [
+      { name: 'Jalen Hurts', position: 'QB', team: 'PHI' },
+      { name: 'Patrick Mahomes', position: 'QB', team: 'KC' },
+      { name: 'Josh Allen', position: 'QB', team: 'BUF' },
+      { name: 'Christian McCaffrey', position: 'RB', team: 'SF' },
+      { name: 'Travis Kelce', position: 'TE', team: 'KC' },
+      { name: 'Stefon Diggs', position: 'WR', team: 'BUF' },
+      { name: 'Dak Prescott', position: 'QB', team: 'DAL' },
+      { name: 'CeeDee Lamb', position: 'WR', team: 'DAL' }
+    ];
+    
+    const player = players[Math.floor(Math.random() * players.length)];
+    const game = games[Math.floor(Math.random() * games.length)];
+    
+    // Use existing prop templates
+    const propTemplates = {
+      QB: [
+        { prop: "Passing Yards", line: 250.5 },
+        { prop: "Passing Yards", line: 275.5 },
+        { prop: "Passing Touchdowns", line: 1.5 },
+        { prop: "Passing Touchdowns", line: 2.5 }
+      ],
+      RB: [
+        { prop: "Rushing Yards", line: 60.5 },
+        { prop: "Rushing Yards", line: 75.5 },
+        { prop: "Rushing Touchdowns", line: 0.5 },
+        { prop: "Rushing Touchdowns", line: 1.5 }
+      ],
+      WR: [
+        { prop: "Receiving Yards", line: 50.5 },
+        { prop: "Receiving Yards", line: 65.5 },
+        { prop: "Receiving Touchdowns", line: 0.5 },
+        { prop: "Receiving Touchdowns", line: 1.5 }
+      ],
+      TE: [
+        { prop: "Receiving Yards", line: 35.5 },
+        { prop: "Receiving Yards", line: 45.5 },
+        { prop: "Receiving Touchdowns", line: 0.5 },
+        { prop: "Receiving Touchdowns", line: 1.5 }
+      ]
+    };
+    
+    const templates = propTemplates[player.position as keyof typeof propTemplates];
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    
+    return {
+      id: 'pod-1',
+      league: 'NFL',
+      player: player.name,
+      prop: template.prop,
+      line: template.line,
+      game: game,
+      resolved: false
+    };
+  });
   const [podChoice, setPodChoice] = useState<"over" | "under" | null>(null);
   const [podStreak, setPodStreak] = useState<number>(0);
   const [myParlayOfDay, setMyParlayOfDay] = useState<string | null>(null);
@@ -554,23 +611,30 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [poll, currentParty, simulation.currentGame, submitVote]);
 
   const handlePodPick = useCallback((choice: "over" | "under") => {
-    if (!pickOfDay || !currentParty) return;
+    if (!pickOfDay) return;
     setPodChoice(choice);
     
+    // Add Pick of the Day to myPolls as a regular poll
+    const podPoll: MyPollVote = {
+      id: `pod-${pickOfDay.id}-${Date.now()}`,
+      pickLabel: `${pickOfDay.player} ${choice === 'over' ? 'Over' : 'Under'} ${pickOfDay.line} ${pickOfDay.prop}`,
+      partyName: 'Pick of the Day',
+      choice: choice === 'over' ? 'hit' : 'miss', // Map over/under to hit/miss for consistency
+      status: 'pending', // Will stay pending since this is for a different game
+      decidedAt: Date.now(),
+      // No metadata needed since this won't be resolved
+    };
+    
+    setMyPolls(prev => [...prev, podPoll]);
+    
     setTimeout(() => {
-      const correct: "over" | "under" = Math.random() > 0.5 ? "over" : "under";
-      setPickOfDay((p) => p ? { ...p, resolved: true, correct } : p);
-      const won = correct === choice;
-      if (currentParty) {
-        setPartyScores((m) => ({ 
-          ...m, 
-          [currentParty.id]: { 
-            ...(m[currentParty.id] || {}), 
-            [me]: ((m[currentParty.id]?.[me] || 0) + (won ? 12 : 0)) 
-          } 
-        }));
+      // Simulate win/loss for streak tracking (but don't resolve the poll)
+      const won = Math.random() < 0.6; // 60% win rate for demo
+      if (won) {
+        setPodStreak((st) => st + 1);
+      } else {
+        setPodStreak(0);
       }
-      setPodStreak((st) => won ? st + 1 : 0);
     }, 1200);
   }, [pickOfDay, currentParty, me]);
 

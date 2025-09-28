@@ -5,19 +5,32 @@ import { colors } from '@/theme/tokens';
 import { Card, Badge } from '@/components/ui';
 
 export const Leaderboard: React.FC = () => {
-  const { currentParty, partyScores } = useStore();
+  const { currentParty, partyScores, user } = useStore();
   
   if (!currentParty) {
     return (
       <Card style={{ backgroundColor: colors.slate, borderColor: colors.steel, borderWidth: 1, borderRadius: 12 }}>
         <View style={{ padding: 16 }}>
-          <Text style={{ color: colors.textMid, fontSize: 14 }}>Select a party first to view its unique leaderboard.</Text>
+          <Text style={{ color: colors.textMid, fontSize: 16, textAlign: 'center' }}>Select a party first!</Text>
         </View>
       </Card>
     );
   }
   
-  const scores = partyScores[currentParty.id] || {};
+  // Static demo scores with user at top
+  const staticDemoScores = {
+    [user?.fullName || user?.username || 'You']: 167,  // You at the top
+    'Alex': 127,
+    'Jordan': 89,
+    'Sam': 76,
+    'Taylor': 64,
+    'Riley': 52,
+    'Casey': 41,
+    'Devin': 28,
+    'Kai': 15
+  };
+  
+  const scores = partyScores[currentParty.id] || staticDemoScores;
   const entries = Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const leader = entries[0]?.[0];
 
