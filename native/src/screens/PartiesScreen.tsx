@@ -5,6 +5,7 @@ import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
 import { ConnectedAccountsModal } from '@/components/ConnectedAccountsModal';
 import { useStore } from '@/store/AppStore';
+import { DateRangePicker, validateDateRange } from '@/components/DatePicker';
 
 export const PartiesScreen: React.FC = () => {
   const { 
@@ -37,6 +38,11 @@ export const PartiesScreen: React.FC = () => {
   const [dateError, setDateError] = useState<string>('');
   const [createError, setCreateError] = useState<string>('');
   const [accountsModalVisible, setAccountsModalVisible] = useState<boolean>(false);
+  const [showInviteCode, setShowInviteCode] = useState(false);
+  const [createdParty, setCreatedParty] = useState<any>(null);
+  const [inviteCode, setInviteCode] = useState<string>('');
+  const [buyInConfirmed, setBuyInConfirmed] = useState<boolean>(false);
+  const [tempBuyIn, setTempBuyIn] = useState<string>('');
 
   const ALL_SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'] as const;
 
@@ -47,35 +53,35 @@ export const PartiesScreen: React.FC = () => {
   const getToday = () => formatDate(new Date());
   const getNextWeek = () => formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
+  const handleBuyInConfirm = () => {
+    const amount = parseFloat(tempBuyIn);
+    if (amount && amount > 0) {
+      setNewBuyIn(tempBuyIn);
+      setBuyInConfirmed(true);
+    }
+  };
+
+  const handleBuyInChange = (value: string) => {
+    setTempBuyIn(value);
+    setBuyInConfirmed(false);
+  };
+
   const handleCreateParty = () => {
     setDateError('');
     setCreateError('');
     
-    if (!newPartyStart || !newPartyEnd) {
-      setDateError('Please select a start and end date');
-      return;
-    }
-    
-    const start = new Date(newPartyStart);
-    const end = new Date(newPartyEnd);
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setDateError('Invalid dates');
-      return;
-    }
-    
-    if (end < start) {
-      setDateError('End date must be after start date');
-      return;
-    }
-    
-    const msInYear = 365 * 24 * 60 * 60 * 1000;
-    if (end.getTime() - start.getTime() > msInYear) {
-      setDateError('Maximum duration is 1 year');
+    // Use the new date validation
+    const dateValidation = validateDateRange(newPartyStart, newPartyEnd);
+    if (!dateValidation.isValid) {
+      setDateError(dateValidation.errors.join(', '));
       return;
     }
 
     if (newPartyType === 'competitive') {
+      if (!buyInConfirmed) {
+        setCreateError('Please confirm your buy-in amount');
+        return;
+      }
       const buyIn = parseFloat(newBuyIn);
       if (!buyIn || buyIn <= 0) {
         setCreateError('Enter a valid buy-in amount');
@@ -101,6 +107,18 @@ export const PartiesScreen: React.FC = () => {
       parseInt(newEvalLimit)
     );
     
+    // Generate invite code for display
+    const generatedInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setInviteCode(generatedInviteCode);
+    setCreatedParty({
+      name: newPartyName.trim() || (newPartyType === 'friendly' ? 'Friendly Party' : 'Competitive Party'),
+      type: newPartyType,
+      joinCode: generatedInviteCode,
+      maxParticipants: 16,
+      currentParticipants: 1
+    });
+    setShowInviteCode(true);
+    
     setOpen(false);
     setNewPartyName('');
     setNewPartyType('friendly');
@@ -109,20 +127,38 @@ export const PartiesScreen: React.FC = () => {
     setNewBuyIn('');
     setNewAllowedSports(['NFL', 'NBA']);
     setNewEvalLimit('5');
+    setBuyInConfirmed(false);
+    setTempBuyIn('');
   };
 
   const handleJoinParty = () => {
-    const buyIn = parseFloat(joinBuyIn);
-    if (code.trim().toUpperCase().startsWith('C') && (!buyIn || buyIn <= 0)) {
-      setDateError('Enter the party buy-in to join');
-      return;
-    }
-    if (code.trim().toUpperCase().startsWith('C') && wallet < buyIn) {
-      setDateError('Insufficient wallet funds for buy-in');
-      return;
+    setDateError('');
+    
+    // Check if it's a competitive party (starts with 'C')
+    const isCompetitive = code.trim().toUpperCase().startsWith('C');
+    
+    if (isCompetitive) {
+      const buyIn = parseFloat(joinBuyIn);
+      
+      // Validate buy-in amount
+      if (!joinBuyIn.trim() || isNaN(buyIn) || buyIn <= 0) {
+        setDateError('Enter a valid buy-in amount to join this competitive party');
+        return;
+      }
+      
+      // Check wallet balance
+      if (wallet < buyIn) {
+        setDateError(`Insufficient wallet funds. You need $${buyIn} but only have $${wallet.toFixed(2)}`);
+        return;
+      }
+      
+      // For competitive parties, require buy-in
+      joinParty(code, buyIn);
+    } else {
+      // For friendly parties, no buy-in required
+      joinParty(code);
     }
     
-    joinParty(code, code.trim().toUpperCase().startsWith('C') ? buyIn : undefined);
     setOpen(false);
     setCode('');
     setJoinBuyIn('');
@@ -303,6 +339,16 @@ export const PartiesScreen: React.FC = () => {
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.textHigh, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
                     <Text style={{ color: colors.textMid, marginTop: 2, textTransform: 'capitalize' }}>{item.type}</Text>
+                    {item.joinCode && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
+                        <Text style={{ color: colors.textLow, fontSize: 12 }}>Join Code:</Text>
+                        <View style={{ backgroundColor: colors.chip, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ color: colors.textHigh, fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
+                            {item.joinCode}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 4 }}>
                     {item.id === selectedPartyId && (
@@ -435,21 +481,39 @@ export const PartiesScreen: React.FC = () => {
                       
                       <View style={{ marginBottom: 8 }}>
                         <Text style={{ color: colors.textMid, fontSize: 12, marginBottom: 4 }}>Buy-In ($)</Text>
-                        <TextInput
-                          placeholder="e.g. 25"
-                          placeholderTextColor={colors.textLow}
-                          value={newBuyIn}
-                          onChangeText={setNewBuyIn}
-                          keyboardType="numeric"
-                          style={{ 
-                            color: colors.textHigh, 
-                            borderColor: colors.steel, 
-                            borderWidth: 1, 
-                            borderRadius: 8, 
-                            padding: 8,
-                            backgroundColor: colors.slate
-                          }}
-                        />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TextInput
+                            placeholder="e.g. 25"
+                            placeholderTextColor={colors.textLow}
+                            value={tempBuyIn || newBuyIn}
+                            onChangeText={handleBuyInChange}
+                            keyboardType="numeric"
+                            style={{ 
+                              flex: 1,
+                              color: colors.textHigh, 
+                              borderColor: buyInConfirmed ? colors.mint : colors.steel, 
+                              borderWidth: 1,
+                              borderRadius: 8, 
+                              padding: 8,
+                              backgroundColor: colors.slate
+                            }} 
+                          />
+                          <Button
+                            variant={buyInConfirmed ? 'mint' : 'secondary'}
+                            onPress={handleBuyInConfirm}
+                            disabled={!tempBuyIn || parseFloat(tempBuyIn) <= 0}
+                            style={{ paddingHorizontal: 12 }}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: '600' }}>
+                              {buyInConfirmed ? '✓' : 'Confirm'}
+                            </Text>
+                          </Button>
+                        </View>
+                        {buyInConfirmed && (
+                          <Text style={{ color: colors.mint, fontSize: 10, marginTop: 4 }}>
+                            Buy-in confirmed: ${newBuyIn}
+                          </Text>
+                        )}
                       </View>
                       
                       <View style={{ marginBottom: 8 }}>
@@ -470,44 +534,14 @@ export const PartiesScreen: React.FC = () => {
                     </View>
                   )}
 
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textMid, marginBottom: 6, fontSize: 14 }}>Start date</Text>
-                      <TextInput 
-                        type="date"
-                        value={newPartyStart} 
-                        onChangeText={setNewPartyStart} 
-                        placeholder={getToday()}
-                        placeholderTextColor={colors.textLow} 
-                        style={{ 
-                          color: colors.textHigh, 
-                          borderColor: colors.steel, 
-                          borderWidth: 1, 
-                          borderRadius: 10, 
-                          padding: 10,
-                          backgroundColor: colors.chip
-                        }} 
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textMid, marginBottom: 6, fontSize: 14 }}>End date</Text>
-                      <TextInput 
-                        type="date"
-                        value={newPartyEnd} 
-                        onChangeText={setNewPartyEnd} 
-                        placeholder={getNextWeek()}
-                        placeholderTextColor={colors.textLow} 
-                        style={{ 
-                          color: colors.textHigh, 
-                          borderColor: colors.steel, 
-                          borderWidth: 1, 
-                          borderRadius: 10, 
-                          padding: 10,
-                          backgroundColor: colors.chip
-                        }} 
-                      />
-                    </View>
-                  </View>
+                  <DateRangePicker
+                    startDate={newPartyStart}
+                    endDate={newPartyEnd}
+                    onStartDateChange={setNewPartyStart}
+                    onEndDateChange={setNewPartyEnd}
+                    startDateError={dateError}
+                    endDateError={dateError}
+                  />
                   
                   {dateError && <Text style={{ color: colors.error, fontSize: 12 }}>{dateError}</Text>}
                   {createError && <Text style={{ color: colors.error, fontSize: 12 }}>{createError}</Text>}
@@ -539,32 +573,47 @@ export const PartiesScreen: React.FC = () => {
                 
                 {code.trim().toUpperCase().startsWith('C') && (
                   <View>
-                    <Text style={{ color: colors.textMid, marginBottom: 6, fontSize: 14 }}>Buy-In required ($)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
+                      <Text style={{ color: colors.textMid, fontSize: 14 }}>Buy-In required ($)</Text>
+                      <Badge color={colors.error} style={{ paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>REQUIRED</Text>
+                      </Badge>
+                    </View>
                     <TextInput
-                      placeholder="e.g. 25"
+                      placeholder="Enter buy-in amount (e.g. 25)"
                       placeholderTextColor={colors.textLow}
                       value={joinBuyIn}
                       onChangeText={setJoinBuyIn}
                       keyboardType="numeric"
                       style={{ 
                         color: colors.textHigh, 
-                        borderColor: colors.steel, 
+                        borderColor: joinBuyIn ? colors.mint : colors.steel, 
                         borderWidth: 1, 
                         borderRadius: 10, 
                         padding: 10,
                         backgroundColor: colors.chip
                       }}
                     />
-                    <Text style={{ color: colors.textLow, fontSize: 10, marginTop: 4 }}>
-                      This party requires buy-in. Your wallet will be charged on join.
+                    <Text style={{ color: colors.textLow, fontSize: 12, marginTop: 4 }}>
+                      You have ${wallet.toFixed(2)} in your wallet
                     </Text>
                   </View>
                 )}
                 
                 {dateError && <Text style={{ color: colors.error, fontSize: 12 }}>{dateError}</Text>}
                 
-                <Button variant='primary' onPress={handleJoinParty}>
-                  <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Join</Text>
+                <Button 
+                  variant='primary' 
+                  onPress={handleJoinParty}
+                  disabled={code.trim().toUpperCase().startsWith('C') && (!joinBuyIn.trim() || parseFloat(joinBuyIn) <= 0)}
+                  style={{ opacity: code.trim().toUpperCase().startsWith('C') && (!joinBuyIn.trim() || parseFloat(joinBuyIn) <= 0) ? 0.5 : 1 }}
+                >
+                  <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>
+                    {code.trim().toUpperCase().startsWith('C') && (!joinBuyIn.trim() || parseFloat(joinBuyIn) <= 0) 
+                      ? 'Enter Buy-In Amount' 
+                      : 'Join Party'
+                    }
+                  </Text>
                 </Button>
               </View>
             )}
@@ -577,6 +626,35 @@ export const PartiesScreen: React.FC = () => {
           visible={accountsModalVisible}
           onClose={() => setAccountsModalVisible(false)}
         />
+
+        {/* Invite Code Display Modal */}
+        <Modal visible={showInviteCode} transparent animationType='fade' onRequestClose={() => setShowInviteCode(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowInviteCode(false)}>
+            <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
+              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+                Party Created Successfully!
+              </Text>
+              
+              <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16 }}>
+                Share this invite code with friends to let them join your party:
+              </Text>
+              
+              <View style={{ backgroundColor: colors.chip, borderRadius: 8, padding: 16, marginBottom: 16, alignItems: 'center' }}>
+                <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
+                  {inviteCode}
+                </Text>
+              </View>
+              
+              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
+                Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
+              </Text>
+              
+              <Button variant='primary' onPress={() => setShowInviteCode(false)}>
+                <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
+              </Button>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </SafeAreaView>
   );

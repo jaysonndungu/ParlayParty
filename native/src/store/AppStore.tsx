@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { authAPI } from '@/services/authAPI';
+import { supabaseAPI } from '../services/supabaseAPI';
 
 // Simple in-memory storage for development
 const mockStorage = {
@@ -10,7 +10,17 @@ const mockStorage = {
 };
 
 type PartyType = 'friendly' | 'competitive';
-export type Party = { id: string; name: string; type: PartyType; startDate: string; endDate: string };
+export type Party = { 
+  id: string; 
+  name: string; 
+  type: PartyType; 
+  startDate: string; 
+  endDate: string;
+  joinCode?: string;
+  maxParticipants?: number;
+  currentParticipants?: number;
+  members?: any[];
+};
 export type ActionEvent = { id: string; game: string; user: string; priority: number; isClutch: boolean; text: string };
 export type Poll = { id: string; question: string; options: { id: string; label: string }[]; endsAt: number };
 export type MyPollVote = { id: string; pickLabel: string; partyName: string; choice: 'hit' | 'chalk'; status: 'pending' | 'cashed' | 'chalked'; decidedAt?: number };
@@ -48,6 +58,10 @@ interface StoreState {
   authLoading: boolean;
   authError: string | null;
   
+  // Party API state
+  partyLoading: boolean;
+  partyError: string | null;
+  
   // Existing state
   me: string;
   myParties: Party[];
@@ -76,8 +90,8 @@ interface StoreState {
   now: number;
   
   // Actions
-  createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => void;
-  joinParty: (code: string, buyIn?: number) => void;
+  createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => Promise<void>;
+  joinParty: (code: string, buyIn?: number) => Promise<void>;
   selectParty: (id: string) => void;
   submitVote: (opts: { id: string; label: string; partyName: string; choice: 'hit' | 'chalk'; isClutch?: boolean }) => void;
   votePoll: (optionId: string) => void;
@@ -89,7 +103,7 @@ interface StoreState {
   setProfilePhotoUrl: (url: string | null) => void;
   setConnections: (connections: Record<string, boolean>) => void;
   addChatMessage: (partyId: string, message: ChatMessage) => void;
-  getChatMessages: (partyId: string) => ChatMessage[];
+  getChatMessages: (partyId: string) => Promise<ChatMessage[]>;
 }
 
 const StoreCtx = createContext<StoreState | null>(null);
@@ -136,6 +150,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   } | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  
+  // Party API state
+  const [partyLoading, setPartyLoading] = useState<boolean>(false);
+  const [partyError, setPartyError] = useState<string | null>(null);
   
   const me = USERS[0];
   const currentParty = useMemo(() => myParties.find(p => p.id === selectedPartyId) || null, [myParties, selectedPartyId]);
@@ -184,71 +202,43 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     mockStorage.setItem('pod_streak_me', String(podStreak));
   }, [podStreak]);
 
-  // Seed demo parties once
-  useEffect(() => {
-    if (myParties.length > 0) return;
-    
-    const friendly: Party = { id: "p_friendly", name: "Sunday Sweats", type: "friendly", startDate: "2024-01-01", endDate: "2024-01-31" };
-    const comp: Party = { id: "p_comp", name: "Competitive Party", type: "competitive", startDate: "2024-02-01", endDate: "2024-02-28" };
-    const seeded = [friendly, comp];
-    setMyParties(seeded);
-    
-    // Initialize scores
-    setPartyScores({ p_friendly: { ...initialScores }, p_comp: { ...initialScores } });
-    
-    // Seed picks per party
-    const mkPick = (override?: Partial<PartyPick>): PartyPick => ({
-      id: Math.random().toString(36).slice(2),
-      game: ["SF @ DAL","KC @ BUF","PHI @ NYG","MIA @ NE"][Math.floor(Math.random()*4)],
-      line: Math.random() > 0.5 ? `o/u ${(40 + Math.floor(Math.random()*12)+0.5).toFixed(1)}` : `TT o${(20 + Math.floor(Math.random()*12)+0.5).toFixed(1)}`,
-      score: `${20+Math.floor(Math.random()*15)}-${17+Math.floor(Math.random()*15)}`,
-      clock: `Q${3+Math.floor(Math.random()*2)} ${String(Math.floor(Math.random()*7)).padStart(2,"0")}:${String(Math.floor(Math.random()*60)).padStart(2,"0")}`,
-      minsLeft: 5 + Math.floor(Math.random()*20),
-      takers: Array.from(new Set([USERS[Math.floor(Math.random()*USERS.length)], USERS[Math.floor(Math.random()*USERS.length)]])),
-      isClutch: Math.random() > 0.7,
-      startAtMs: Date.now() + (5 + Math.floor(Math.random()*86)) * 60_000,
-      ...override,
-    });
-    
-    setPartyPicks({
-      p_friendly: (() => {
-        const nowMs = Date.now();
-        const arr: PartyPick[] = [];
-        arr.push(
-          mkPick({ takers: [USERS[0], USERS[2]], startAtMs: nowMs + 25 * 60_000, isClutch: false }),
-          mkPick({ takers: [USERS[0]], startAtMs: nowMs + 45 * 60_000, isClutch: false }),
-          mkPick({ takers: [USERS[1]], startAtMs: nowMs + 15 * 60_000 }),
-          mkPick({ takers: [USERS[3], USERS[6]], startAtMs: nowMs + 55 * 60_000 }),
-          mkPick({ takers: [USERS[4], USERS[5]], startAtMs: nowMs - 30 * 60_000, isClutch: true, minsLeft: 3 }),
-          mkPick({ takers: [USERS[2]], startAtMs: nowMs - 10 * 60_000 }),
-          mkPick({ takers: [USERS[7], USERS[0]], startAtMs: nowMs - 5 * 60_000, isClutch: Math.random() > 0.6 }),
-        );
-        return arr;
-      })(),
-      p_comp: (() => {
-        const nowMs = Date.now();
-        const arr: PartyPick[] = [];
-        arr.push(
-          mkPick({ takers: [USERS[3]], startAtMs: nowMs - 35 * 60_000, isClutch: true, minsLeft: 1 }),
-          mkPick({ takers: [USERS[1], USERS[4]], startAtMs: nowMs - 20 * 60_000 }),
-          mkPick({ takers: [USERS[0]], startAtMs: nowMs + 20 * 60_000 }),
-          mkPick({ takers: [USERS[7]], startAtMs: nowMs + 60 * 60_000 }),
-          mkPick({ takers: [USERS[2], USERS[5]], startAtMs: nowMs - 8 * 60_000 }),
-          mkPick({ takers: [USERS[6]], startAtMs: nowMs + 10 * 60_000 }),
-          mkPick({ takers: [USERS[4]], startAtMs: nowMs + 40 * 60_000 }),
-        );
-        return arr;
-      })(),
-    });
-    
-    setSelectedPartyId("p_friendly");
-  }, [myParties.length]);
 
   // Update clock
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Load parties from Supabase when user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      loadPartiesFromSupabase();
+    }
+  }, [isAuthenticated, user]);
+
+  const loadPartiesFromSupabase = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const response = await supabaseAPI.getMyParties();
+      if (response.success && response.data) {
+        const apiParties = response.data.parties.map((apiParty: any) => ({
+          id: apiParty.id,
+          name: apiParty.name,
+          type: apiParty.type,
+          startDate: apiParty.startDate,
+          endDate: apiParty.endDate,
+          joinCode: apiParty.joinCode,
+          maxParticipants: apiParty.maxParticipants,
+          currentParticipants: apiParty.currentParticipants,
+          members: apiParty.members || []
+        }));
+        setMyParties(apiParties);
+      }
+    } catch (error) {
+      console.error('Failed to load parties from Supabase:', error);
+    }
+  }, [user]);
 
   // Simulate the Attention Engine producing events
   useEffect(() => {
@@ -338,50 +328,90 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [currentParty, partyAllowedSports]);
 
-  const createParty = useCallback((name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => {
-    const id = Math.random().toString(36).slice(2);
-    const defaultName = type === "friendly" ? "Friendly Party" : "Competitive Party";
-    const p: Party = { id, name: name.trim() || defaultName, type, startDate, endDate };
+  const createParty = useCallback(async (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => {
+    setPartyLoading(true);
+    setPartyError(null);
     
-    setMyParties((arr) => [p, ...arr]);
-    setPartyScores((m) => ({ ...m, [id]: { ...initialScores } }));
-    
-    if (type === "competitive" && buyIn) {
-      setWallet((w) => w - buyIn);
-      setPartyPrizePools((m) => ({ ...m, [id]: buyIn }));
-      setEvalSettings((m) => ({ ...m, [id]: { limit: Math.max(1, Math.min(1000, evalLimit || 5)), selected: [] } }));
-      setPartyBuyIns((m) => ({ ...m, [id]: buyIn }));
-      setPartyAllowedSports((m) => ({ ...m, [id]: [...(allowedSports || ["NFL", "NBA"])] }));
+    try {
+      const response = await supabaseAPI.createParty({
+        name: name.trim() || (type === "friendly" ? "Friendly Party" : "Competitive Party"),
+        type,
+        startDate,
+        endDate,
+        buyIn,
+        allowedSports: allowedSports || ['NFL', 'NBA'],
+        description: '',
+        isPrivate: false
+      });
+      
+      if (response.success && response.data) {
+        const { party, joinCode } = response.data;
+        
+        // Refresh parties from Supabase instead of manually adding
+        await loadPartiesFromSupabase();
+        setPartyScores((m) => ({ ...m, [party.id]: { ...initialScores } }));
+        
+        if (type === "competitive" && buyIn) {
+          setWallet((w) => w - buyIn);
+          setPartyPrizePools((m) => ({ ...m, [party.id]: buyIn }));
+          setEvalSettings((m) => ({ ...m, [party.id]: { limit: Math.max(1, Math.min(1000, evalLimit || 5)), selected: [] } }));
+          setPartyBuyIns((m) => ({ ...m, [party.id]: buyIn }));
+          setPartyAllowedSports((m) => ({ ...m, [party.id]: [...(allowedSports || ["NFL", "NBA"])] }));
+        }
+        
+        setSelectedPartyId(party.id);
+      } else {
+        throw new Error('Failed to create party');
+      }
+    } catch (error) {
+      console.error('Create party error:', error);
+      setPartyError(error instanceof Error ? error.message : 'Failed to create party');
+    } finally {
+      setPartyLoading(false);
     }
-    
-    setSelectedPartyId(id);
-  }, []);
+  }, [user, loadPartiesFromSupabase]);
 
-  const joinParty = useCallback((code: string, buyIn?: number) => {
-    const prefix = code.trim()[0]?.toUpperCase();
-    const t: PartyType = prefix === "C" ? "competitive" : "friendly";
+  const joinParty = useCallback(async (code: string, buyIn?: number) => {
+    setPartyLoading(true);
+    setPartyError(null);
     
-    if (t === "competitive" && buyIn) {
-      setWallet((w) => w - buyIn);
+    try {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await supabaseAPI.joinParty({
+        joinCode: code.trim(),
+        username: user.username,
+        displayName: user.fullName || user.username,
+        profilePhotoUrl: user.profilePictureUrl || undefined
+      });
+      
+      if (response.success && response.data) {
+        const { party } = response.data;
+        
+        // Refresh parties from Supabase instead of manually adding
+        await loadPartiesFromSupabase();
+        setPartyScores((m) => ({ ...m, [party.id]: { ...initialScores } }));
+        
+        if (party.type === "competitive" && party.buyIn) {
+          setWallet((w) => w - (party.buyIn || 0));
+          setPartyPrizePools((m) => ({ ...m, [party.id]: party.buyIn || 0 }));
+          setPartyBuyIns((m) => ({ ...m, [party.id]: party.buyIn || 0 }));
+          setPartyAllowedSports((m) => ({ ...m, [party.id]: party.allowedSports || ["NFL", "NBA"] }));
+        }
+        
+        setSelectedPartyId(party.id);
+      } else {
+        throw new Error('Failed to join party');
+      }
+    } catch (error) {
+      console.error('Join party error:', error);
+      setPartyError(error instanceof Error ? error.message : 'Failed to join party');
+    } finally {
+      setPartyLoading(false);
     }
-    
-    const id = Math.random().toString(36).slice(2);
-    const nameSuffix = code.slice(-4).toUpperCase();
-    const today = new Date();
-    const in7 = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const p: Party = { id, name: `Invite Party ${nameSuffix}`, type: t, startDate: today.toISOString().slice(0,10), endDate: in7.toISOString().slice(0,10) };
-    
-    setMyParties((arr) => [p, ...arr]);
-    setPartyScores((m) => ({ ...m, [id]: { ...initialScores } }));
-    
-    if (t === "competitive" && buyIn) {
-      setPartyPrizePools((m) => ({ ...m, [id]: buyIn }));
-      setPartyBuyIns((m) => ({ ...m, [id]: buyIn }));
-      setPartyAllowedSports((m) => ({ ...m, [id]: ["NFL", "NBA"] }));
-    }
-    
-    setSelectedPartyId(id);
-  }, []);
+  }, [user, loadPartiesFromSupabase]);
 
   const selectParty = useCallback((id: string) => {
     setSelectedPartyId(id);
@@ -479,11 +509,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAuthError(null);
     
     try {
-      const response = await authAPI.register(userData);
-      setAuthToken(response.token);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      setWallet(response.user.walletBalance);
+      const response = await supabaseAPI.signUp(userData.email, userData.password, {
+        username: userData.username,
+        fullName: userData.fullName,
+      });
+      
+      if (response.user) {
+        const userProfile = await supabaseAPI.getUserProfile(response.user.id);
+        setUser({
+          id: parseInt(userProfile.id),
+          email: userProfile.email,
+          username: userProfile.username,
+          fullName: userProfile.full_name,
+          walletBalance: userProfile.wallet_balance,
+          profilePictureUrl: userProfile.profile_picture_url,
+        });
+        setIsAuthenticated(true);
+        setWallet(userProfile.wallet_balance);
+      }
+      
       return response;
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Registration failed');
@@ -501,11 +545,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAuthError(null);
     
     try {
-      const response = await authAPI.login(credentials);
-      setAuthToken(response.token);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      setWallet(response.user.walletBalance);
+      const response = await supabaseAPI.signIn(credentials.email, credentials.password);
+      
+      if (response.user) {
+        const userProfile = await supabaseAPI.getUserProfile(response.user.id);
+        setUser({
+          id: parseInt(userProfile.id),
+          email: userProfile.email,
+          username: userProfile.username,
+          fullName: userProfile.full_name,
+          walletBalance: userProfile.wallet_balance,
+          profilePictureUrl: userProfile.profile_picture_url,
+        });
+        setIsAuthenticated(true);
+        setWallet(userProfile.wallet_balance);
+      }
+      
       return response;
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Login failed');
@@ -515,12 +570,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setAuthToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
-    setAuthError(null);
-    setWallet(100); // Reset to default
+  const logout = useCallback(async () => {
+    try {
+      await supabaseAPI.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError(null);
+      setWallet(100); // Reset to default
+    }
   }, []);
 
   const updateProfile = useCallback(async (updates: {
@@ -528,36 +589,51 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     profilePictureUrl?: string;
     walletBalance?: number;
   }) => {
-    if (!authToken) throw new Error('Not authenticated');
+    if (!user) throw new Error('Not authenticated');
     
     try {
-      const response = await authAPI.updateProfile(authToken, updates);
-      setUser(response.user);
+      const response = await supabaseAPI.updateUserProfile(user.id.toString(), {
+        full_name: updates.fullName,
+        profile_picture_url: updates.profilePictureUrl,
+        wallet_balance: updates.walletBalance,
+      });
+      
+      setUser({
+        ...user,
+        fullName: response.full_name,
+        profilePictureUrl: response.profile_picture_url,
+        walletBalance: response.wallet_balance,
+      });
+      
       if (updates.walletBalance !== undefined) {
         setWallet(updates.walletBalance);
       }
+      
       return response;
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Profile update failed');
       throw error;
     }
-  }, [authToken]);
+  }, [user]);
 
   const addWalletFunds = useCallback(async (amount: number) => {
-    if (!authToken) throw new Error('Not authenticated');
+    if (!user) throw new Error('Not authenticated');
     
     try {
-      const response = await authAPI.addWalletFunds(authToken, amount);
-      setWallet(response.newBalance);
-      if (user) {
-        setUser({ ...user, walletBalance: response.newBalance });
-      }
-      return response;
+      const newBalance = user.walletBalance + amount;
+      const response = await supabaseAPI.updateUserProfile(user.id.toString(), {
+        wallet_balance: newBalance,
+      });
+      
+      setWallet(newBalance);
+      setUser({ ...user, walletBalance: newBalance });
+      
+      return { newBalance };
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Failed to add funds');
       throw error;
     }
-  }, [authToken, user]);
+  }, [user]);
 
   const value: StoreState = useMemo(() => ({
     // Authentication state
@@ -566,6 +642,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     user,
     authLoading,
     authError,
+    
+    // Party API state
+    partyLoading,
+    partyError,
     
     // Existing state
     me,
@@ -619,6 +699,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }), [
     // Authentication dependencies
     isAuthenticated, authToken, user, authLoading, authError,
+    // Party API dependencies
+    partyLoading, partyError,
     // Existing dependencies
     me, myParties, selectedPartyId, currentParty, partyScores, partyPrizePools, partyPicks, 
     partyBuyIns, partyAllowedSports, evalSettings, wallet, events, clutch, clutchStream, 
