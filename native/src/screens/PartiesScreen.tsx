@@ -197,6 +197,7 @@ export const PartiesScreen: React.FC = () => {
   // Removed sports selector
 
   const handleDeleteParty = async (partyId: string, partyName: string) => {
+    console.log('Delete party requested:', { partyId, partyName, userId: user?.id });
     Alert.alert(
       'Delete Party',
       `Are you sure you want to delete "${partyName}"? This action cannot be undone.`,
@@ -210,6 +211,7 @@ export const PartiesScreen: React.FC = () => {
               await deleteParty(partyId);
               Alert.alert('Success', 'Party deleted successfully');
             } catch (error) {
+              console.error('Delete party error:', error);
               Alert.alert('Error', 'Failed to delete party');
             }
           }
@@ -335,7 +337,16 @@ export const PartiesScreen: React.FC = () => {
               <View style={{ padding: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textHigh, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
+                    <Pressable
+                      onLongPress={() => {
+                        // Show delete option for party creator on long press
+                        if (user && item.createdBy === user.id) {
+                          handleDeleteParty(item.id, item.name);
+                        }
+                      }}
+                    >
+                      <Text style={{ color: colors.textHigh, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
+                    </Pressable>
                     <Text style={{ color: colors.textMid, marginTop: 2, textTransform: 'capitalize' }}>{item.type}</Text>
                     {item.joinCode && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
@@ -417,8 +428,14 @@ export const PartiesScreen: React.FC = () => {
                         variant="secondary"
                         style={{ backgroundColor: colors.error }}
                       >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink }}>🗑️</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink }}>Delete</Text>
                       </Button>
+                    )}
+                    {/* Debug info - remove this later */}
+                    {__DEV__ && (
+                      <Text style={{ color: colors.textLow, fontSize: 8 }}>
+                        Creator: {item.createdBy?.substring(0, 8)} | User: {user?.id?.substring(0, 8)}
+                      </Text>
                     )}
                   </View>
                 </View>
