@@ -643,11 +643,11 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
                     <Text style={{ 
                       color: leg.finalOutcome ? 
                         (leg.finalOutcome === 'CASH!' ? colors.gold : colors.error) : 
-                        (leg.current >= leg.total ? colors.gold : colors.textMid), 
+                        colors.textMid, 
                       fontSize: 14, 
                       fontWeight: '600' 
                     }}>
-                      {leg.finalOutcome || (leg.current >= leg.total ? 'CASH!' : 'LIVE')}
+                      {leg.finalOutcome || 'LIVE'}
                     </Text>
                   </View>
                 </View>

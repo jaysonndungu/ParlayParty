@@ -154,42 +154,34 @@ export const NFL_PLAYERS: NFLPlayer[] = [
   { name: "Dalton Schultz", position: "TE", team: "HOU" }
 ];
 
-// Player Props Templates with realistic lines
+// Player Props Templates with realistic lines - ONLY trackable types
 export const PLAYER_PROP_TEMPLATES = {
   QB: [
     { prop: "Passing Yards", line: 250.5, type: "passing_yards" },
     { prop: "Passing Yards", line: 275.5, type: "passing_yards" },
     { prop: "Passing Yards", line: 300.5, type: "passing_yards" },
     { prop: "Passing Touchdowns", line: 1.5, type: "passing_tds" },
-    { prop: "Passing Touchdowns", line: 2.5, type: "passing_tds" },
-    { prop: "Rushing Yards", line: 25.5, type: "rushing_yards" },
-    { prop: "Rushing Yards", line: 35.5, type: "rushing_yards" }
+    { prop: "Passing Touchdowns", line: 2.5, type: "passing_tds" }
   ],
   RB: [
     { prop: "Rushing Yards", line: 60.5, type: "rushing_yards" },
     { prop: "Rushing Yards", line: 75.5, type: "rushing_yards" },
     { prop: "Rushing Yards", line: 90.5, type: "rushing_yards" },
     { prop: "Rushing Touchdowns", line: 0.5, type: "rushing_tds" },
-    { prop: "Rushing Touchdowns", line: 1.5, type: "rushing_tds" },
-    { prop: "Receiving Yards", line: 15.5, type: "receiving_yards" },
-    { prop: "Receiving Yards", line: 25.5, type: "receiving_yards" }
+    { prop: "Rushing Touchdowns", line: 1.5, type: "rushing_tds" }
   ],
   WR: [
     { prop: "Receiving Yards", line: 50.5, type: "receiving_yards" },
     { prop: "Receiving Yards", line: 65.5, type: "receiving_yards" },
     { prop: "Receiving Yards", line: 80.5, type: "receiving_yards" },
     { prop: "Receiving Touchdowns", line: 0.5, type: "receiving_tds" },
-    { prop: "Receiving Touchdowns", line: 1.5, type: "receiving_tds" },
-    { prop: "Receptions", line: 4.5, type: "receptions" },
-    { prop: "Receptions", line: 6.5, type: "receptions" }
+    { prop: "Receiving Touchdowns", line: 1.5, type: "receiving_tds" }
   ],
   TE: [
     { prop: "Receiving Yards", line: 35.5, type: "receiving_yards" },
     { prop: "Receiving Yards", line: 45.5, type: "receiving_yards" },
     { prop: "Receiving Touchdowns", line: 0.5, type: "receiving_tds" },
-    { prop: "Receiving Touchdowns", line: 1.5, type: "receiving_tds" },
-    { prop: "Receptions", line: 3.5, type: "receptions" },
-    { prop: "Receptions", line: 5.5, type: "receptions" }
+    { prop: "Receiving Touchdowns", line: 1.5, type: "receiving_tds" }
   ]
 };
 
@@ -375,6 +367,32 @@ IMPORTANT STATISTICAL REALISM:
 - Touchdowns should be realistic: QBs throw 1-4 TDs per game, RBs rush for 0-2 TDs per game, WRs catch 0-2 TDs per game
 - Game should end at Quarter 4 - do not go beyond Q4
 
+CRITICAL REQUIREMENTS FOR REALISTIC GAME:
+1. MINIMUM STATS GUARANTEE: Each featured player MUST have at least:
+   - 1 touchdown (passing, rushing, or receiving)
+   - Realistic yardage totals (QBs: 200+ yards, RBs: 50+ yards, WRs/TEs: 40+ yards)
+
+2. REALISTIC PLAY DISTRIBUTION:
+   - QBs should have 20-35 passing attempts with 8-15 yards per completion
+   - RBs should have 10-20 rushing attempts with 3-8 yards per carry
+   - WRs/TEs should have 5-15 receptions with 5-15 yards per catch
+   - Include occasional big plays (20+ yards) and rare explosive plays (40+ yards)
+
+3. GAME FLOW REALISM:
+   - Start with conservative play calling, build momentum
+   - Include red zone opportunities and goal line situations
+   - Mix of short passes, runs, and occasional deep shots
+   - Realistic scoring patterns (not every drive ends in points)
+   - Game should end at Quarter 4 - do not go beyond Q4
+
+CRITICAL: Play descriptions must be VERY SPECIFIC for stat tracking:
+- For QB passing: "PlayerName passes for X yards" or "PlayerName completes pass for X yards"
+- For QB rushing: "PlayerName rushes for X yards" or "PlayerName runs for X yards"
+- For RB rushing: "PlayerName rushes for X yards" or "PlayerName runs for X yards"
+- For WR/TE receiving: "PlayerName catches pass for X yards" or "PlayerName receives pass for X yards"
+- For touchdowns: "PlayerName passes for X yards touchdown" or "PlayerName rushes for X yards touchdown" or "PlayerName catches pass for X yards touchdown"
+- ALWAYS include the player name and the exact yardage in every description
+
 JSON Structures:
 
 Play Object Structure:
@@ -411,6 +429,7 @@ Constraints:
 - Quarter Limit: The game MUST end at Quarter 4. Do not create plays beyond Q4.
 - Simplicity: Avoid complex events like penalties, fumbles, or interceptions.
 - Statistical Realism: Ensure all player stats are realistic for their positions (QB passing yards, RB rushing yards, etc.)
+- MINIMUM STATS: Each featured player must have at least 1 touchdown and realistic yardage totals
 - Output Format: Your entire output must be ONLY a valid JSON array. Do not include any markdown formatting, code blocks, or explanatory text. Start with [ and end with ]. Each play object must be properly formatted JSON.`;
   }
 
@@ -429,7 +448,36 @@ Constraints:
     let gameClock = "15:00";
     let quarter = 1;
 
-    // Generate realistic plays (stop at Quarter 4)
+    // Generate realistic plays (stop at Quarter 4) with guaranteed minimum stats
+    let playerATouchdowns = 0;
+    let playerBTouchdowns = 0;
+    let playerAYards = 0;
+    let playerBYards = 0;
+    
+    // Helper function to decrement game clock properly
+    const decrementGameClock = (currentClock: string): string => {
+      const [minutes, seconds] = currentClock.split(':').map(Number);
+      let newMinutes = minutes;
+      let newSeconds = seconds;
+      
+      // Decrement by 5-15 seconds per play (realistic)
+      const decrementSeconds = Math.floor(Math.random() * 11) + 5; // 5-15 seconds
+      newSeconds -= decrementSeconds;
+      
+      // Handle minute rollover
+      if (newSeconds < 0) {
+        newMinutes -= 1;
+        newSeconds += 60;
+      }
+      
+      // Handle quarter end
+      if (newMinutes < 0) {
+        return "0:00"; // End of quarter
+      }
+      
+      return `${newMinutes.toString().padStart(2, '0')}:${newSeconds.toString().padStart(2, '0')}`;
+    };
+    
     for (let i = 0; i < 48; i++) {
       const timestamp = i + 1;
       
@@ -440,9 +488,7 @@ Constraints:
       } else if (quarter >= 4 && gameClock === "0:00") {
         break; // Stop at end of Q4
       } else {
-        const minutes = Math.floor(Math.random() * 3) + 1;
-        const seconds = Math.floor(Math.random() * 60);
-        gameClock = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        gameClock = decrementGameClock(gameClock);
       }
 
       // Random scoring
@@ -457,36 +503,63 @@ Constraints:
       // Generate realistic play descriptions based on position
       let description = '';
       let involvedPlayer = '';
+      let yards = 0;
+      let isTouchdown = false;
       
-      if (Math.random() < 0.4) {
+      // Ensure minimum stats - force touchdowns if needed
+      const needsPlayerATD = playerATouchdowns === 0 && i > 20;
+      const needsPlayerBTD = playerBTouchdowns === 0 && i > 20;
+      
+      if (Math.random() < 0.4 || needsPlayerATD) {
         // Player A involved
         involvedPlayer = playerA.name;
         if (playerA.position === 'QB') {
-          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15; // 8-15 yards mostly, occasional 15-35
+          yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15; // 8-15 yards mostly, occasional 15-35
           description = `${playerA.name} passes for ${yards} yards`;
+          playerAYards += yards;
         } else if (playerA.position === 'RB') {
-          const yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10; // 2-8 yards mostly, occasional 10-25
+          yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10; // 2-8 yards mostly, occasional 10-25
           description = `${playerA.name} rushes for ${yards} yards`;
+          playerAYards += yards;
         } else {
-          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15; // 5-15 yards mostly, occasional 15-35
+          yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15; // 5-15 yards mostly, occasional 15-35
           description = `${playerA.name} catches pass for ${yards} yards`;
+          playerAYards += yards;
         }
-      } else if (Math.random() < 0.7) {
+        
+        // Force touchdown if needed
+        if (needsPlayerATD && Math.random() < 0.3) {
+          isTouchdown = true;
+          playerATouchdowns++;
+          description += ' touchdown';
+        }
+      } else if (Math.random() < 0.7 || needsPlayerBTD) {
         // Player B involved
         involvedPlayer = playerB.name;
         if (playerB.position === 'QB') {
-          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15;
+          yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15;
           description = `${playerB.name} passes for ${yards} yards`;
+          playerBYards += yards;
         } else if (playerB.position === 'RB') {
-          const yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10;
+          yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10;
           description = `${playerB.name} rushes for ${yards} yards`;
+          playerBYards += yards;
         } else {
-          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15;
+          yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15;
           description = `${playerB.name} catches pass for ${yards} yards`;
+          playerBYards += yards;
+        }
+        
+        // Force touchdown if needed
+        if (needsPlayerBTD && Math.random() < 0.3) {
+          isTouchdown = true;
+          playerBTouchdowns++;
+          description += ' touchdown';
         }
       } else {
         // Other players
-        description = `Unknown Player rushes for ${Math.floor(Math.random() * 8) + 2} yards`;
+        yards = Math.floor(Math.random() * 8) + 2;
+        description = `Unknown Player rushes for ${yards} yards`;
       }
 
       const play: GamePlay = {
@@ -583,17 +656,26 @@ Constraints:
     const tdMatch = lowerDesc.match(/touchdown|td|scores/);
     const isTD = !!tdMatch;
 
-    // Determine play type
-    if (lowerDesc.includes('pass') || lowerDesc.includes('completion')) {
-      newStats.passing_yards += yards;
-      if (isTD) newStats.passing_tds += 1;
-    } else if (lowerDesc.includes('rush') || lowerDesc.includes('run')) {
-      newStats.rushing_yards += yards;
-      if (isTD) newStats.rushing_tds += 1;
-    } else if (lowerDesc.includes('catch') || lowerDesc.includes('reception')) {
+    // Debug logging
+    console.log(`Parsing play: "${description}"`);
+    console.log(`Extracted yards: ${yards}, isTD: ${isTD}`);
+
+    // Determine play type - ORDER MATTERS! Check receiving first since "catches pass" contains "pass"
+    if (lowerDesc.includes('catch') || lowerDesc.includes('reception') || lowerDesc.includes('receives')) {
       newStats.receiving_yards += yards;
       newStats.receptions += 1;
       if (isTD) newStats.receiving_tds += 1;
+      console.log(`Updated receiving stats: ${newStats.receiving_yards} yards, ${newStats.receiving_tds} TDs, ${newStats.receptions} receptions`);
+    } else if (lowerDesc.includes('pass') || lowerDesc.includes('completion')) {
+      newStats.passing_yards += yards;
+      if (isTD) newStats.passing_tds += 1;
+      console.log(`Updated passing stats: ${newStats.passing_yards} yards, ${newStats.passing_tds} TDs`);
+    } else if (lowerDesc.includes('rush') || lowerDesc.includes('run')) {
+      newStats.rushing_yards += yards;
+      if (isTD) newStats.rushing_tds += 1;
+      console.log(`Updated rushing stats: ${newStats.rushing_yards} yards, ${newStats.rushing_tds} TDs`);
+    } else {
+      console.log(`No matching play type found for: "${description}"`);
     }
     
     return newStats;
