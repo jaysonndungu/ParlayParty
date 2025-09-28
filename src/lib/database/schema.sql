@@ -42,7 +42,6 @@ CREATE TABLE parties (
     -- Competitive party fields
     buy_in DECIMAL(10,2),
     prize_pool DECIMAL(10,2) DEFAULT 0.00,
-    max_participants INTEGER DEFAULT NULL,
     current_participants INTEGER DEFAULT 1,
     
     -- Evaluation settings
@@ -53,7 +52,6 @@ CREATE TABLE parties (
     CONSTRAINT valid_date_range CHECK (end_date > start_date),
     CONSTRAINT valid_duration CHECK (end_date - start_date <= INTERVAL '1 year'),
     CONSTRAINT valid_buy_in CHECK (type = 'friendly' OR (type = 'competitive' AND buy_in > 0)),
-    CONSTRAINT valid_max_participants CHECK (max_participants IS NULL OR max_participants >= 2)
 );
 
 -- ============================================================================

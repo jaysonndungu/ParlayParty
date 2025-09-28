@@ -232,9 +232,8 @@ export const supabaseAPI = {
       start_date: partyData.startDate,
       end_date: partyData.endDate,
       buy_in_amount: partyData.buyIn || 0,
-      prize_pool: 0,
+      prize_pool: partyData.buyIn || 0,
       allowed_sports: partyData.allowedSports || ['NFL', 'NBA'],
-      max_members: 16,
       current_participants: 1,
       join_code: joinCode,
       description: partyData.description || null,
@@ -262,17 +261,27 @@ export const supabaseAPI = {
 
     if (memberError) throw memberError;
 
-    // Deduct buy-in from creator's wallet if competitive
-    if (partyData.type === 'competitive' && partyData.buyIn && partyData.buyIn > 0) {
-      const { error: walletError } = await supabase
-        .from('users')
-        .update({
-          wallet_balance: supabase.raw(`wallet_balance - ${partyData.buyIn}`),
-        })
-        .eq('id', user.id);
+      // Deduct buy-in from creator's wallet if competitive
+      if (partyData.type === 'competitive' && partyData.buyIn && partyData.buyIn > 0) {
+        // First get current balance
+        const { data: userProfile, error: fetchError } = await supabase
+          .from('users')
+          .select('wallet_balance')
+          .eq('id', user.id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // Update with new balance
+        const { error: walletError } = await supabase
+          .from('users')
+          .update({
+            wallet_balance: userProfile.wallet_balance - partyData.buyIn,
+          })
+          .eq('id', user.id);
 
-      if (walletError) throw walletError;
-    }
+        if (walletError) throw walletError;
+      }
 
     return {
       success: true,
@@ -291,7 +300,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,
@@ -307,6 +315,34 @@ export const supabaseAPI = {
         joinCode: joinCode, // Use the generated join code, not the database value
       }
     };
+  },
+
+  // Delete a party (only by creator)
+  async deleteParty(partyId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // First check if user is the creator
+    const { data: party, error: partyError } = await supabase
+      .from('parties')
+      .select('creator_id')
+      .eq('id', partyId)
+      .single();
+
+    if (partyError) throw partyError;
+    if (party.creator_id !== user.id) {
+      throw new Error('Only the party creator can delete the party');
+    }
+
+    // Delete the party (cascade will handle party_members and party_chat_messages)
+    const { error: deleteError } = await supabase
+      .from('parties')
+      .delete()
+      .eq('id', partyId);
+
+    if (deleteError) throw deleteError;
+
+    return { success: true };
   },
 
   async joinParty(joinData: {
@@ -342,7 +378,7 @@ export const supabaseAPI = {
     }
 
     // Check if party is full
-    if (party.current_participants >= party.max_members) {
+    if (party.current_participants >= 16) {
       throw new Error('Party has reached its maximum number of participants');
     }
 
@@ -363,7 +399,7 @@ export const supabaseAPI = {
       const { error: walletError } = await supabase
         .from('users')
         .update({
-          wallet_balance: supabase.raw(`wallet_balance - ${party.buy_in_amount}`),
+          wallet_balance: userProfile.wallet_balance - party.buy_in_amount,
         })
         .eq('id', user.id);
 
@@ -411,7 +447,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants + 1,
           description: party.description,
           isPrivate: party.is_private,
@@ -454,7 +489,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,
@@ -497,7 +531,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,

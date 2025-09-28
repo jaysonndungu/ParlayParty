@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
-import { ConnectedAccountsModal } from '@/components/ConnectedAccountsModal';
 import { useStore } from '@/store/AppStore';
 import { DateRangePicker, validateDateRange } from '@/components/DatePicker';
 
@@ -14,9 +13,11 @@ export const PartiesScreen: React.FC = () => {
     selectParty, 
     createParty, 
     joinParty,
+    deleteParty,
     wallet,
     addFunds,
-    withdrawFunds
+    withdrawFunds,
+    user
   } = useStore();
   
   const [open, setOpen] = useState(false);
@@ -30,21 +31,22 @@ export const PartiesScreen: React.FC = () => {
   const [newPartyStart, setNewPartyStart] = useState('');
   const [newPartyEnd, setNewPartyEnd] = useState('');
   const [newBuyIn, setNewBuyIn] = useState<string>('');
-  const [newAllowedSports, setNewAllowedSports] = useState<string[]>(['NFL', 'NBA']);
+  // Removed sports selector - using default sports
   const [newEvalLimit, setNewEvalLimit] = useState<string>('5');
   const [addFundsAmt, setAddFundsAmt] = useState<string>('');
   const [withdrawAmt, setWithdrawAmt] = useState<string>('');
   const [walletError, setWalletError] = useState<string>('');
   const [dateError, setDateError] = useState<string>('');
   const [createError, setCreateError] = useState<string>('');
-  const [accountsModalVisible, setAccountsModalVisible] = useState<boolean>(false);
   const [showInviteCode, setShowInviteCode] = useState(false);
   const [createdParty, setCreatedParty] = useState<any>(null);
   const [inviteCode, setInviteCode] = useState<string>('');
   const [buyInConfirmed, setBuyInConfirmed] = useState<boolean>(false);
   const [tempBuyIn, setTempBuyIn] = useState<string>('');
+  const [showPartySettings, setShowPartySettings] = useState(false);
+  const [selectedPartyForSettings, setSelectedPartyForSettings] = useState<{id: string, name: string} | null>(null);
 
-  const ALL_SPORTS = ['NFL', 'NBA', 'MLB', 'NHL'] as const;
+  // Removed sports selector - using default sports
 
   const formatDate = (date: Date) => {
     return date.toISOString().slice(0, 10);
@@ -66,7 +68,7 @@ export const PartiesScreen: React.FC = () => {
     setBuyInConfirmed(false);
   };
 
-  const handleCreateParty = () => {
+  const handleCreateParty = async () => {
     setDateError('');
     setCreateError('');
     
@@ -87,37 +89,41 @@ export const PartiesScreen: React.FC = () => {
         setCreateError('Enter a valid buy-in amount');
         return;
       }
-      if (!newAllowedSports.length) {
-        setCreateError('Select at least one allowed sport');
-        return;
-      }
+      // Using default sports - no validation needed
       if (wallet < buyIn) {
         setCreateError('Insufficient funds in wallet for buy-in');
         return;
       }
     }
 
-    createParty(
-      newPartyName,
-      newPartyType,
-      newPartyStart,
-      newPartyEnd,
-      newPartyType === 'competitive' ? parseFloat(newBuyIn) : undefined,
-      newAllowedSports,
-      parseInt(newEvalLimit)
-    );
-    
-    // Generate invite code for display
-    const generatedInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setInviteCode(generatedInviteCode);
-    setCreatedParty({
-      name: newPartyName.trim() || (newPartyType === 'friendly' ? 'Friendly Party' : 'Competitive Party'),
-      type: newPartyType,
-      joinCode: generatedInviteCode,
-      maxParticipants: 16,
-      currentParticipants: 1
-    });
-    setShowInviteCode(true);
+    try {
+      const result = await createParty(
+        newPartyName,
+        newPartyType,
+        newPartyStart,
+        newPartyEnd,
+        newPartyType === 'competitive' ? parseFloat(newBuyIn) : undefined,
+        ['NFL', 'NBA'], // Default sports
+        parseInt(newEvalLimit)
+      );
+      
+      if (result) {
+        // Use the actual joinCode from the API
+        setInviteCode(result.joinCode);
+        setCreatedParty({
+          name: newPartyName.trim() || (newPartyType === 'friendly' ? 'Friendly Party' : 'Competitive Party'),
+          type: newPartyType,
+          joinCode: result.joinCode,
+          maxParticipants: 16,
+          currentParticipants: 1
+        });
+        setShowInviteCode(true);
+      } else {
+        setCreateError('Failed to create party');
+      }
+    } catch (error) {
+      setCreateError('Failed to create party');
+    }
     
     setOpen(false);
     setNewPartyName('');
@@ -125,7 +131,7 @@ export const PartiesScreen: React.FC = () => {
     setNewPartyStart('');
     setNewPartyEnd('');
     setNewBuyIn('');
-    setNewAllowedSports(['NFL', 'NBA']);
+    // Removed sports selector
     setNewEvalLimit('5');
     setBuyInConfirmed(false);
     setTempBuyIn('');
@@ -190,11 +196,36 @@ export const PartiesScreen: React.FC = () => {
     setWithdrawAmt('');
   };
 
-  const toggleSport = (sport: string) => {
-    setNewAllowedSports(prev => 
-      prev.includes(sport) 
-        ? prev.filter(s => s !== sport)
-        : [...prev, sport]
+  // Removed sports selector
+
+  const handlePartySettings = (partyId: string, partyName: string) => {
+    setSelectedPartyForSettings({ id: partyId, name: partyName });
+    setShowPartySettings(true);
+  };
+
+  const handleDeleteParty = async (partyId: string, partyName: string) => {
+    console.log('Delete party requested:', { partyId, partyName, userId: user?.id });
+    Alert.alert(
+      'Delete Party',
+      `Are you sure you want to delete "${partyName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteParty(partyId);
+              Alert.alert('Success', 'Party deleted successfully');
+              setShowPartySettings(false);
+              setSelectedPartyForSettings(null);
+            } catch (error) {
+              console.error('Delete party error:', error);
+              Alert.alert('Error', 'Failed to delete party');
+            }
+          }
+        }
+      ]
     );
   };
 
@@ -204,31 +235,9 @@ export const PartiesScreen: React.FC = () => {
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
         <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700' }}>Your Parties</Text>
-        
-        {/* Only show Connected Sportsbooks button if user is logged in */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => setAccountsModalVisible(true)}
-            style={{
-              backgroundColor: 'transparent',
-              paddingHorizontal: spacing(1),
-              paddingVertical: spacing(1),
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.primary,
-              marginRight: spacing(1),
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600', textAlign: 'center', lineHeight: 14 }}>
-              Connect{'\n'}Sportsbooks
-            </Text>
-          </TouchableOpacity>
-          <Button variant='primary' onPress={() => setOpen(true)}>
-            <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
-          </Button>
-        </View>
+        <Button variant='primary' onPress={() => setOpen(true)}>
+          <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
+        </Button>
       </View>
 
       {/* Wallet */}
@@ -337,7 +346,16 @@ export const PartiesScreen: React.FC = () => {
               <View style={{ padding: 12 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textHigh, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
+                    <Pressable
+                      onLongPress={() => {
+                        // Show delete option for party creator on long press
+                        if (user && item.createdBy === user.id) {
+                          handleDeleteParty(item.id, item.name);
+                        }
+                      }}
+                    >
+                      <Text style={{ color: colors.textHigh, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
+                    </Pressable>
                     <Text style={{ color: colors.textMid, marginTop: 2, textTransform: 'capitalize' }}>{item.type}</Text>
                     {item.joinCode && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}>
@@ -390,18 +408,51 @@ export const PartiesScreen: React.FC = () => {
                   <Text style={{ color: colors.textMid, fontSize: 10, marginTop: 4, textAlign: 'center' }}>{status}</Text>
                 </View>
                 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Badge color={colors.chip}>{item.type}</Badge>
-                  <Button 
-                    onPress={() => selectParty(item.id)} 
-                    disabled={item.id === selectedPartyId}
-                    variant={item.id === selectedPartyId ? "secondary" : "primary"}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '600' }}>
-                      {item.id === selectedPartyId ? 'Current' : 'Open'}
+                {/* Party Type Badge */}
+                <View style={{ marginBottom: 8 }}>
+                  <Badge color={colors.chip}>
+                    <Text style={{ color: colors.textHigh, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
+                      {item.type}
                     </Text>
+                  </Badge>
+                </View>
+                
+                {/* Action Buttons */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
+                    <Button 
+                      onPress={() => {
+                        selectParty(item.id);
+                        // Navigate to chat tab - this would need to be handled by parent component
+                        // For now, we'll just select the party and user can manually go to chat
+                      }}
+                      variant="secondary"
+                      style={{ flex: 1, minWidth: 80 }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600' }}>💬 Chat</Text>
+                    </Button>
+                    <Button 
+                      onPress={() => selectParty(item.id)} 
+                      disabled={item.id === selectedPartyId}
+                      variant={item.id === selectedPartyId ? "secondary" : "primary"}
+                      style={{ flex: 1, minWidth: 80 }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600' }}>
+                        {item.id === selectedPartyId ? 'Current' : 'Open'}
+                      </Text>
+                    </Button>
+                  </View>
+                  
+                  {/* Settings button - always show */}
+                  <Button 
+                    onPress={() => handlePartySettings(item.id, item.name)} 
+                    variant="secondary"
+                    style={{ backgroundColor: colors.steel, minWidth: 80 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600' }}>⚙️ Settings</Text>
                   </Button>
                 </View>
+                
               </View>
             </Card>
           );
@@ -516,21 +567,7 @@ export const PartiesScreen: React.FC = () => {
                         )}
                       </View>
                       
-                      <View style={{ marginBottom: 8 }}>
-                        <Text style={{ color: colors.textMid, fontSize: 12, marginBottom: 4 }}>Allowed Sports</Text>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                          {ALL_SPORTS.map(sport => (
-                            <Button
-                              key={sport}
-                              variant={newAllowedSports.includes(sport) ? 'primary' : 'secondary'}
-                              onPress={() => toggleSport(sport)}
-                              style={{ minWidth: 60 }}
-                            >
-                              <Text style={{ fontSize: 10, fontWeight: '600' }}>{sport}</Text>
-                            </Button>
-                          ))}
-                        </View>
-                      </View>
+                      {/* Removed sports selector - using default sports */}
                     </View>
                   )}
 
@@ -619,42 +656,102 @@ export const PartiesScreen: React.FC = () => {
             )}
           </Pressable>
         </Pressable>
-        </Modal>
+      </Modal>
 
-        {/* Connected Accounts Modal */}
-        <ConnectedAccountsModal
-          visible={accountsModalVisible}
-          onClose={() => setAccountsModalVisible(false)}
-        />
-
-        {/* Invite Code Display Modal */}
-        <Modal visible={showInviteCode} transparent animationType='fade' onRequestClose={() => setShowInviteCode(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowInviteCode(false)}>
-            <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
-              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-                Party Created Successfully!
+      {/* Invite Code Display Modal */}
+      <Modal visible={showInviteCode} transparent animationType='fade' onRequestClose={() => setShowInviteCode(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowInviteCode(false)}>
+          <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
+            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+              Party Created Successfully!
+            </Text>
+            
+            <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16 }}>
+              Share this invite code with friends to let them join your party:
+            </Text>
+            
+            <View style={{ backgroundColor: colors.chip, borderRadius: 8, padding: 16, marginBottom: 16, alignItems: 'center' }}>
+              <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
+                {inviteCode}
               </Text>
-              
-              <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16 }}>
-                Share this invite code with friends to let them join your party:
-              </Text>
-              
-              <View style={{ backgroundColor: colors.chip, borderRadius: 8, padding: 16, marginBottom: 16, alignItems: 'center' }}>
-                <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
-                  {inviteCode}
-                </Text>
-              </View>
-              
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
-                Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
-              </Text>
-              
-              <Button variant='primary' onPress={() => setShowInviteCode(false)}>
-                <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
-              </Button>
-            </Pressable>
+            </View>
+            
+            <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
+              Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
+            </Text>
+            
+            <Button variant='primary' onPress={() => setShowInviteCode(false)}>
+              <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
+            </Button>
           </Pressable>
-        </Modal>
+        </Pressable>
+      </Modal>
+
+      {/* Party Settings Modal */}
+      <Modal visible={showPartySettings} transparent animationType='fade' onRequestClose={() => setShowPartySettings(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowPartySettings(false)}>
+          <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
+            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12, textAlign: 'center' }}>
+              Party Settings
+            </Text>
+            
+            <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>
+              {selectedPartyForSettings?.name}
+            </Text>
+            
+            <View style={{ gap: 12 }}>
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Party editing will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>✏️ Edit Party</Text>
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Member management will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>👥 Manage Members</Text>
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Party analytics will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>📊 View Analytics</Text>
+              </Button>
+              
+              <Button 
+                variant="primary" 
+                onPress={() => {
+                  if (selectedPartyForSettings) {
+                    handleDeleteParty(selectedPartyForSettings.id, selectedPartyForSettings.name);
+                  }
+                }}
+                style={{ backgroundColor: colors.error }}
+              >
+                <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>
+                  🗑️ Delete Party
+                </Text>
+              </Button>
+            </View>
+            
+            <Button 
+              variant="secondary" 
+              onPress={() => setShowPartySettings(false)}
+              style={{ marginTop: 16 }}
+            >
+              <Text style={{ fontSize: 14 }}>Close</Text>
+            </Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
       </View>
     </SafeAreaView>
   );
