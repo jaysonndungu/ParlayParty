@@ -232,7 +232,7 @@ export const supabaseAPI = {
       start_date: partyData.startDate,
       end_date: partyData.endDate,
       buy_in_amount: partyData.buyIn || 0,
-      prize_pool: 0,
+      prize_pool: partyData.buyIn || 0,
       allowed_sports: partyData.allowedSports || ['NFL', 'NBA'],
       max_members: 16,
       current_participants: 1,
@@ -262,17 +262,27 @@ export const supabaseAPI = {
 
     if (memberError) throw memberError;
 
-    // Deduct buy-in from creator's wallet if competitive
-    if (partyData.type === 'competitive' && partyData.buyIn && partyData.buyIn > 0) {
-      const { error: walletError } = await supabase
-        .from('users')
-        .update({
-          wallet_balance: supabase.raw(`wallet_balance - ${partyData.buyIn}`),
-        })
-        .eq('id', user.id);
+      // Deduct buy-in from creator's wallet if competitive
+      if (partyData.type === 'competitive' && partyData.buyIn && partyData.buyIn > 0) {
+        // First get current balance
+        const { data: userProfile, error: fetchError } = await supabase
+          .from('users')
+          .select('wallet_balance')
+          .eq('id', user.id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // Update with new balance
+        const { error: walletError } = await supabase
+          .from('users')
+          .update({
+            wallet_balance: userProfile.wallet_balance - partyData.buyIn,
+          })
+          .eq('id', user.id);
 
-      if (walletError) throw walletError;
-    }
+        if (walletError) throw walletError;
+      }
 
     return {
       success: true,
@@ -363,7 +373,7 @@ export const supabaseAPI = {
       const { error: walletError } = await supabase
         .from('users')
         .update({
-          wallet_balance: supabase.raw(`wallet_balance - ${party.buy_in_amount}`),
+          wallet_balance: userProfile.wallet_balance - party.buy_in_amount,
         })
         .eq('id', user.id);
 

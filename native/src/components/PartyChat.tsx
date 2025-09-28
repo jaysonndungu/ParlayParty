@@ -34,6 +34,15 @@ export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
     loadMessages();
   }, [partyId]);
 
+  // Refresh messages when component becomes visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadMessages();
+    }, 2000); // Refresh every 2 seconds as fallback
+
+    return () => clearInterval(interval);
+  }, [partyId]);
+
   // Set up real-time subscription
   useEffect(() => {
     if (partyId) {
@@ -85,6 +94,11 @@ export const PartyChat: React.FC<PartyChatProps> = ({ partyId, partyName }) => {
       setIsSending(true);
       await chatAPI.sendMessage(partyId, newMessage.trim());
       setNewMessage('');
+      
+      // Force refresh messages after sending
+      setTimeout(() => {
+        loadMessages();
+      }, 500);
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
