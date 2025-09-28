@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { authAPI } from '@/services/authAPI';
 
 // Simple in-memory storage for development
 const mockStorage = {
@@ -33,6 +34,21 @@ const GAMES = ['SF @ DAL','KC @ BUF','PHI @ NYG','MIA @ NE','LAL @ DEN','BOS @ M
 const initialScores: Record<string, number> = Object.fromEntries(USERS.map(u => [u, Math.floor(Math.random()*40)]));
 
 interface StoreState {
+  // Authentication state
+  isAuthenticated: boolean;
+  authToken: string | null;
+  user: {
+    id: number;
+    email: string;
+    username: string;
+    fullName: string;
+    walletBalance: number;
+    profilePictureUrl: string | null;
+  } | null;
+  authLoading: boolean;
+  authError: string | null;
+  
+  // Existing state
   me: string;
   myParties: Party[];
   selectedPartyId: string | null;
@@ -106,6 +122,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [connections, setConnections] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState<number>(Date.now());
+  
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [user, setUser] = useState<{
+    id: number;
+    email: string;
+    username: string;
+    fullName: string;
+    walletBalance: number;
+    profilePictureUrl: string | null;
+  } | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const me = USERS[0];
   const currentParty = useMemo(() => myParties.find(p => p.id === selectedPartyId) || null, [myParties, selectedPartyId]);
@@ -363,7 +393,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const submitVote = useCallback((opts: { id: string; label: string; partyName: string; choice: 'hit' | 'chalk'; isClutch?: boolean }) => {
     const { id, label, partyName, choice, isClutch } = opts;
-    setMyPolls((arr)=>[{ id, pickLabel: label, partyName, choice, status: "pending" }, ...arr]);
+    const uniqueId = `${id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setMyPolls((arr)=>[{ id: uniqueId, pickLabel: label, partyName, choice, status: "pending" }, ...arr]);
     
     setTimeout(() => {
       const correct = Math.random() > 0.5 ? "hit" : "chalk";
@@ -377,7 +408,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } 
         }));
       }
-      setMyPolls((arr) => arr.map(mp => mp.id === id ? { ...mp, status: correct === "hit" ? "cashed" : "chalked", decidedAt: Date.now() } : mp));
+      setMyPolls((arr) => arr.map(mp => mp.id === uniqueId ? { ...mp, status: correct === "hit" ? "cashed" : "chalked", decidedAt: Date.now() } : mp));
     }, 2500);
   }, [me, currentParty]);
 
@@ -437,7 +468,106 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
+  // Authentication methods
+  const register = useCallback(async (userData: {
+    email: string;
+    username: string;
+    fullName: string;
+    password: string;
+  }) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    
+    try {
+      const response = await authAPI.register(userData);
+      setAuthToken(response.token);
+      setUser(response.user);
+      setIsAuthenticated(true);
+      setWallet(response.user.walletBalance);
+      return response;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Registration failed');
+      throw error;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  const login = useCallback(async (credentials: {
+    email: string;
+    password: string;
+  }) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    
+    try {
+      const response = await authAPI.login(credentials);
+      setAuthToken(response.token);
+      setUser(response.user);
+      setIsAuthenticated(true);
+      setWallet(response.user.walletBalance);
+      return response;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Login failed');
+      throw error;
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    setAuthToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+    setAuthError(null);
+    setWallet(100); // Reset to default
+  }, []);
+
+  const updateProfile = useCallback(async (updates: {
+    fullName?: string;
+    profilePictureUrl?: string;
+    walletBalance?: number;
+  }) => {
+    if (!authToken) throw new Error('Not authenticated');
+    
+    try {
+      const response = await authAPI.updateProfile(authToken, updates);
+      setUser(response.user);
+      if (updates.walletBalance !== undefined) {
+        setWallet(updates.walletBalance);
+      }
+      return response;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Profile update failed');
+      throw error;
+    }
+  }, [authToken]);
+
+  const addWalletFunds = useCallback(async (amount: number) => {
+    if (!authToken) throw new Error('Not authenticated');
+    
+    try {
+      const response = await authAPI.addWalletFunds(authToken, amount);
+      setWallet(response.newBalance);
+      if (user) {
+        setUser({ ...user, walletBalance: response.newBalance });
+      }
+      return response;
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Failed to add funds');
+      throw error;
+    }
+  }, [authToken, user]);
+
   const value: StoreState = useMemo(() => ({
+    // Authentication state
+    isAuthenticated,
+    authToken,
+    user,
+    authLoading,
+    authError,
+    
+    // Existing state
     me,
     myParties,
     selectedPartyId,
@@ -463,6 +593,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     profilePhotoUrl,
     connections,
     now,
+    
+    // Existing methods
     createParty,
     joinParty,
     selectParty,
@@ -477,13 +609,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setConnections,
     addChatMessage,
     getChatMessages,
+    
+    // Authentication methods
+    register,
+    login,
+    logout,
+    updateProfile,
+    addWalletFunds,
   }), [
+    // Authentication dependencies
+    isAuthenticated, authToken, user, authLoading, authError,
+    // Existing dependencies
     me, myParties, selectedPartyId, currentParty, partyScores, partyPrizePools, partyPicks, 
     partyBuyIns, partyAllowedSports, evalSettings, wallet, events, clutch, clutchStream, 
     poll, resolvedOptionId, myPolls, pickOfDay, podChoice, podStreak, myParlayOfDay, 
     friendParlayOfDay, profilePhotoUrl, connections, now, createParty, joinParty, selectParty, 
     submitVote, votePoll, handlePodPick, addFunds, withdrawFunds, setProfilePhotoUrl, 
-    setConnections, addChatMessage, getChatMessages
+    setConnections, addChatMessage, getChatMessages,
+    // Authentication method dependencies
+    register, login, logout, updateProfile, addWalletFunds
   ]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;

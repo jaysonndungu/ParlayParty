@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
 import { useStore } from '@/store/AppStore';
@@ -160,7 +161,8 @@ export const PartiesScreen: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, padding: spacing(2) }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
+      <View style={{ flex: 1, padding: spacing(2) }}>
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
         <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700' }}>Your Parties</Text>
@@ -545,6 +547,7 @@ export const PartiesScreen: React.FC = () => {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
