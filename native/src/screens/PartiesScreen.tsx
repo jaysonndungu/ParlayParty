@@ -434,7 +434,7 @@ export const PartiesScreen: React.FC = () => {
                     {/* Debug info - remove this later */}
                     {__DEV__ && (
                       <Text style={{ color: colors.textLow, fontSize: 8 }}>
-                        Creator: {item.createdBy?.substring(0, 8)} | User: {user?.id?.substring(0, 8)}
+                        Creator: {item.createdBy?.substring?.(0, 8) || 'N/A'} | User: {user?.id?.substring?.(0, 8) || 'N/A'}
                       </Text>
                     )}
                   </View>
