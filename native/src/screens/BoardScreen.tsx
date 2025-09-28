@@ -689,11 +689,8 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.primary, fontSize: 20, fontWeight: '800' }}>
-              Parlay
-            </Text>
-            <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '800' }}>
-              Party
+            <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '800' }}>
+              {currentParty?.name ?? 'ParlayParty'}
             </Text>
             {currentParty && (
               <Text style={{ color: colors.textMid, fontSize: 12, textTransform: 'capitalize' }}>
