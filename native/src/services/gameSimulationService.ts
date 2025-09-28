@@ -368,6 +368,13 @@ Key Players to Feature:
 Player A: ${playerA.name}, ${playerA.position} for the ${teamA.name}
 Player B: ${playerB.name}, ${playerB.position} for the ${teamB.name}
 
+IMPORTANT STATISTICAL REALISM:
+- Quarterbacks should have realistic passing stats: 8-15 yards per completion, occasional 20-40 yard completions, rare 50+ yard completions
+- Running backs should have realistic rushing stats: 2-8 yards per carry, occasional 10-20 yard runs, rare 30+ yard runs
+- Wide receivers should have realistic receiving stats: 5-15 yards per catch, occasional 20-30 yard catches, rare 40+ yard catches
+- Touchdowns should be realistic: QBs throw 1-4 TDs per game, RBs rush for 0-2 TDs per game, WRs catch 0-2 TDs per game
+- Game should end at Quarter 4 - do not go beyond Q4
+
 JSON Structures:
 
 Play Object Structure:
@@ -401,7 +408,9 @@ Constraints:
 - Length: Generate a condensed game script of approximately 40-50 total plays, followed by the final summary object.
 - Player Emphasis: While the game's outcome must be random, ensure that Player A and Player B are frequently involved in the action.
 - Time Flow: The timestamp_seconds should be a simple integer incrementing by 1 for each play. The game_clock should decrease by a realistic, variable amount of game time with each play.
+- Quarter Limit: The game MUST end at Quarter 4. Do not create plays beyond Q4.
 - Simplicity: Avoid complex events like penalties, fumbles, or interceptions.
+- Statistical Realism: Ensure all player stats are realistic for their positions (QB passing yards, RB rushing yards, etc.)
 - Output Format: Your entire output must be ONLY a valid JSON array. Do not include any markdown formatting, code blocks, or explanatory text. Start with [ and end with ]. Each play object must be properly formatted JSON.`;
   }
 
@@ -420,14 +429,16 @@ Constraints:
     let gameClock = "15:00";
     let quarter = 1;
 
-    // Generate 45 plays
-    for (let i = 0; i < 45; i++) {
+    // Generate realistic plays (stop at Quarter 4)
+    for (let i = 0; i < 48; i++) {
       const timestamp = i + 1;
       
-      // Update game clock (simplified)
-      if (i % 8 === 0 && i > 0) {
+      // Update game clock and quarters (stop at Q4)
+      if (i % 12 === 0 && i > 0 && quarter < 4) {
         quarter++;
         gameClock = "15:00";
+      } else if (quarter >= 4 && gameClock === "0:00") {
+        break; // Stop at end of Q4
       } else {
         const minutes = Math.floor(Math.random() * 3) + 1;
         const seconds = Math.floor(Math.random() * 60);
@@ -435,12 +446,47 @@ Constraints:
       }
 
       // Random scoring
-      if (Math.random() < 0.1) { // 10% chance of scoring
+      if (Math.random() < 0.08) { // 8% chance of scoring
         if (Math.random() < 0.5) {
           teamAScore += Math.random() < 0.7 ? 7 : 3; // 70% TD, 30% FG
         } else {
           teamBScore += Math.random() < 0.7 ? 7 : 3;
         }
+      }
+
+      // Generate realistic play descriptions based on position
+      let description = '';
+      let involvedPlayer = '';
+      
+      if (Math.random() < 0.4) {
+        // Player A involved
+        involvedPlayer = playerA.name;
+        if (playerA.position === 'QB') {
+          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15; // 8-15 yards mostly, occasional 15-35
+          description = `${playerA.name} passes for ${yards} yards`;
+        } else if (playerA.position === 'RB') {
+          const yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10; // 2-8 yards mostly, occasional 10-25
+          description = `${playerA.name} rushes for ${yards} yards`;
+        } else {
+          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15; // 5-15 yards mostly, occasional 15-35
+          description = `${playerA.name} catches pass for ${yards} yards`;
+        }
+      } else if (Math.random() < 0.7) {
+        // Player B involved
+        involvedPlayer = playerB.name;
+        if (playerB.position === 'QB') {
+          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 8) + 8 : Math.floor(Math.random() * 20) + 15;
+          description = `${playerB.name} passes for ${yards} yards`;
+        } else if (playerB.position === 'RB') {
+          const yards = Math.random() < 0.8 ? Math.floor(Math.random() * 7) + 2 : Math.floor(Math.random() * 15) + 10;
+          description = `${playerB.name} rushes for ${yards} yards`;
+        } else {
+          const yards = Math.random() < 0.7 ? Math.floor(Math.random() * 11) + 5 : Math.floor(Math.random() * 20) + 15;
+          description = `${playerB.name} catches pass for ${yards} yards`;
+        }
+      } else {
+        // Other players
+        description = `Unknown Player rushes for ${Math.floor(Math.random() * 8) + 2} yards`;
       }
 
       const play: GamePlay = {
@@ -451,8 +497,8 @@ Constraints:
         distance: Math.random() < 0.8 ? Math.floor(Math.random() * 20) + 1 : null,
         yard_line: Math.floor(Math.random() * 100),
         possessing_team: Math.random() < 0.5 ? teamA.name : teamB.name,
-        description: `${Math.random() < 0.3 ? playerA.name : Math.random() < 0.6 ? playerB.name : 'Unknown Player'} ${Math.random() < 0.5 ? 'rushes for' : 'passes for'} ${Math.floor(Math.random() * 15) + 1} yards`,
-        involved_players: Math.random() < 0.3 ? [playerA.name] : Math.random() < 0.6 ? [playerB.name] : [],
+        description,
+        involved_players: involvedPlayer ? [involvedPlayer] : [],
         team_A_score: teamAScore,
         team_B_score: teamBScore
       };

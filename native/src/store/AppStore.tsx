@@ -856,7 +856,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       
       playIndex++;
-    }, 3000); // 3 second delay between plays
+    }, 1500); // 1.5 second delay between plays
   }, [handleSimulationEnd]);
 
   const handleSimulationEnd = useCallback((simulationGame: SimulationGame) => {
@@ -872,7 +872,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           user: 'AI Simulation',
           priority: 10,
           isClutch: true,
-          text: `Game Over! Final Score: ${finalPlay.final_score[simulationGame.teamA.abbreviation]} - ${finalPlay.final_score[simulationGame.teamB.abbreviation]}`
+          text: `Game Over! Final Score: ${finalPlay?.final_score?.[simulationGame.teamA.abbreviation] || '0'} - ${finalPlay?.final_score?.[simulationGame.teamB.abbreviation] || '0'}`
         };
         setEvents(prevEvents => [finalEvent, ...prevEvents.slice(0, 29)]);
         
@@ -894,7 +894,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         user: 'AI Simulation',
         priority: 10,
         isClutch: true,
-        text: `Game Over! Final Score: ${finalPlay.final_score[simulationGame.teamA.abbreviation]} - ${finalPlay.final_score[simulationGame.teamB.abbreviation]}. ${simulationGame.playerA.player}: ${playerAOutcome}, ${simulationGame.playerB.player}: ${playerBOutcome}`
+        text: `Game Over! Final Score: ${finalPlay?.final_score?.[simulationGame.teamA.abbreviation] || '0'} - ${finalPlay?.final_score?.[simulationGame.teamB.abbreviation] || '0'}. ${simulationGame.playerA.player}: ${playerAOutcome === 'hit' ? 'CASH!' : 'CHALK!'}, ${simulationGame.playerB.player}: ${playerBOutcome === 'hit' ? 'CASH!' : 'CHALK!'}`
       };
       
       setEvents(prevEvents => [finalEvent, ...prevEvents.slice(0, 29)]);

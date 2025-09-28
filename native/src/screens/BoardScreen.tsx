@@ -89,6 +89,10 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
       const scoreString = `${simulation.currentPlay.team_A_score}-${simulation.currentPlay.team_B_score}`;
       const timeString = `Q${simulation.currentPlay.quarter} ${simulation.currentPlay.game_clock}`;
       
+      // Get current stats for each player
+      const playerACurrent = simulation.playerAStats ? simulation.playerAStats[simulation.currentGame.playerA.type as keyof typeof simulation.playerAStats] || 0 : 0;
+      const playerBCurrent = simulation.playerBStats ? simulation.playerBStats[simulation.currentGame.playerB.type as keyof typeof simulation.playerBStats] || 0 : 0;
+      
       // Update live legs with simulation data
       const newLiveLegs = [
         {
@@ -98,9 +102,9 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           score: scoreString,
           bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`,
           user: 'AI Simulation',
-          legProgress: Math.min(100, (simulation.playIndex / simulation.currentGame.gameScript.length) * 100),
-          parlayProgress: Math.min(100, (simulation.playIndex / simulation.currentGame.gameScript.length) * 100),
-          current: simulation.playerAStats ? simulation.playerAStats[simulation.currentGame.playerA.type as keyof typeof simulation.playerAStats] || 0 : 0,
+          legProgress: 0, // Not used anymore
+          parlayProgress: 0, // Not used anymore
+          current: playerACurrent,
           total: simulation.currentGame.playerA.line
         },
         {
@@ -110,9 +114,9 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           score: scoreString,
           bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`,
           user: 'AI Simulation',
-          legProgress: Math.min(100, (simulation.playIndex / simulation.currentGame.gameScript.length) * 100),
-          parlayProgress: Math.min(100, (simulation.playIndex / simulation.currentGame.gameScript.length) * 100),
-          current: simulation.playerBStats ? simulation.playerBStats[simulation.currentGame.playerB.type as keyof typeof simulation.playerBStats] || 0 : 0,
+          legProgress: 0, // Not used anymore
+          parlayProgress: 0, // Not used anymore
+          current: playerBCurrent,
           total: simulation.currentGame.playerB.line
         }
       ];
@@ -130,6 +134,70 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           ],
           odds: '+450',
           status: 'live'
+        }
+      ];
+      
+      setAllParlays(newAllParlays);
+    } else if (!simulation.isRunning && simulation.currentGame && simulation.playerAStats && simulation.playerBStats) {
+      // Show final results when simulation ends
+      const gameString = `${simulation.currentGame.teamA.abbreviation} @ ${simulation.currentGame.teamB.abbreviation}`;
+      
+      // Get final stats for each player
+      const playerACurrent = simulation.playerAStats[simulation.currentGame.playerA.type as keyof typeof simulation.playerAStats] || 0;
+      const playerBCurrent = simulation.playerBStats[simulation.currentGame.playerB.type as keyof typeof simulation.playerBStats] || 0;
+      
+      // Determine final outcomes based on Over/Under
+      const playerAOutcome = simulation.currentGame.playerA.overUnder === 'Over' ? 
+        (playerACurrent > simulation.currentGame.playerA.line ? 'CASH!' : 'CHALK!') :
+        (playerACurrent < simulation.currentGame.playerA.line ? 'CASH!' : 'CHALK!');
+      
+      const playerBOutcome = simulation.currentGame.playerB.overUnder === 'Over' ? 
+        (playerBCurrent > simulation.currentGame.playerB.line ? 'CASH!' : 'CHALK!') :
+        (playerBCurrent < simulation.currentGame.playerB.line ? 'CASH!' : 'CHALK!');
+      
+      // Update live legs with final results
+      const newLiveLegs = [
+        {
+          id: 'sim_1',
+          game: gameString,
+          time: 'FINAL',
+          score: 'GAME OVER',
+          bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: playerACurrent,
+          total: simulation.currentGame.playerA.line,
+          finalOutcome: playerAOutcome
+        },
+        {
+          id: 'sim_2',
+          game: gameString,
+          time: 'FINAL',
+          score: 'GAME OVER',
+          bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: playerBCurrent,
+          total: simulation.currentGame.playerB.line,
+          finalOutcome: playerBOutcome
+        }
+      ];
+      
+      setLiveLegs(newLiveLegs);
+      
+      // Update all parlays with final results
+      const newAllParlays = [
+        {
+          id: 'sim_parlay',
+          user: 'AI Simulation',
+          picks: [
+            { game: gameString, bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`, status: playerAOutcome === 'CASH!' ? 'win' : 'loss' },
+            { game: gameString, bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`, status: playerBOutcome === 'CASH!' ? 'win' : 'loss' }
+          ],
+          odds: '+450',
+          status: 'final'
         }
       ];
       
@@ -176,7 +244,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         }
       ]);
     }
-  }, [simulation.isRunning, simulation.currentGame, simulation.currentPlay, simulation.playIndex]);
+  }, [simulation.isRunning, simulation.currentGame, simulation.currentPlay, simulation.playIndex, simulation.playerAStats, simulation.playerBStats]);
 
   const avatarUrl = (name: string) => {
     const seed = encodeURIComponent(name);
@@ -552,43 +620,38 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
             </View>
             
             <View style={{ marginBottom: 8 }}>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>Leg progress</Text>
+              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>Current Stats</Text>
               <View style={{ 
-                height: 6, 
-                backgroundColor: colors.steel, 
-                borderRadius: 3,
-                overflow: 'hidden'
+                backgroundColor: colors.chip,
+                borderRadius: 8,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: colors.steel
               }}>
-                <View style={{ 
-                  height: '100%', 
-                  width: `${leg.legProgress}%`, 
-                  backgroundColor: colors.mint,
-                  borderRadius: 3
-                }} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700' }}>
+                    {leg.current}
+                  </Text>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Line</Text>
+                    <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '600' }}>
+                      {leg.total}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Status</Text>
+                    <Text style={{ 
+                      color: leg.finalOutcome ? 
+                        (leg.finalOutcome === 'CASH!' ? colors.gold : colors.error) : 
+                        (leg.current >= leg.total ? colors.gold : colors.textMid), 
+                      fontSize: 14, 
+                      fontWeight: '600' 
+                    }}>
+                      {leg.finalOutcome || (leg.current >= leg.total ? 'CASH!' : 'LIVE')}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginTop: 4 }}>
-                {leg.current}/{leg.total} • {leg.legProgress}%
-              </Text>
-            </View>
-            
-            <View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>{leg.user}'s parlay</Text>
-              <View style={{ 
-                height: 6, 
-                backgroundColor: colors.steel, 
-                borderRadius: 3,
-                overflow: 'hidden'
-              }}>
-                <View style={{ 
-                  height: '100%', 
-                  width: `${leg.parlayProgress}%`, 
-                  backgroundColor: colors.primary,
-                  borderRadius: 3
-                }} />
-              </View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginTop: 4 }}>
-                {leg.parlayProgress}%
-              </Text>
             </View>
           </View>
         </Card>
