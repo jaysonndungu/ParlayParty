@@ -95,7 +95,6 @@ export interface Database {
           buy_in_amount: number;
           prize_pool: number;
           allowed_sports: string[];
-          max_members: number;
           current_participants: number;
           join_code: string;
           description: string | null;
@@ -113,7 +112,6 @@ export interface Database {
           buy_in_amount?: number;
           prize_pool?: number;
           allowed_sports?: string[];
-          max_members?: number;
           current_participants?: number;
           join_code: string;
           description?: string | null;
@@ -128,7 +126,6 @@ export interface Database {
           buy_in_amount?: number;
           prize_pool?: number;
           allowed_sports?: string[];
-          max_members?: number;
           current_participants?: number;
           description?: string | null;
           is_private?: boolean;

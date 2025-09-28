@@ -234,7 +234,6 @@ export const supabaseAPI = {
       buy_in_amount: partyData.buyIn || 0,
       prize_pool: partyData.buyIn || 0,
       allowed_sports: partyData.allowedSports || ['NFL', 'NBA'],
-      max_members: 16,
       current_participants: 1,
       join_code: joinCode,
       description: partyData.description || null,
@@ -301,7 +300,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,
@@ -380,7 +378,7 @@ export const supabaseAPI = {
     }
 
     // Check if party is full
-    if (party.current_participants >= party.max_members) {
+    if (party.current_participants >= 16) {
       throw new Error('Party has reached its maximum number of participants');
     }
 
@@ -449,7 +447,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants + 1,
           description: party.description,
           isPrivate: party.is_private,
@@ -492,7 +489,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,
@@ -535,7 +531,6 @@ export const supabaseAPI = {
           buyIn: party.buy_in_amount,
           prizePool: party.prize_pool,
           allowedSports: party.allowed_sports,
-          maxParticipants: party.max_members,
           currentParticipants: party.current_participants,
           description: party.description,
           isPrivate: party.is_private,

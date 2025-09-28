@@ -48,7 +48,7 @@ interface StoreState {
   isAuthenticated: boolean;
   authToken: string | null;
   user: {
-    id: number;
+    id: string;
     email: string;
     username: string;
     fullName: string;
@@ -142,7 +142,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [user, setUser] = useState<{
-    id: number;
+    id: string;
     email: string;
     username: string;
     fullName: string;
@@ -575,7 +575,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (response.user) {
         const userProfile = await supabaseAPI.getUserProfile(response.user.id);
         setUser({
-          id: parseInt(userProfile.id),
+          id: userProfile.id,
           email: userProfile.email,
           username: userProfile.username,
           fullName: userProfile.full_name,
@@ -608,7 +608,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (response.user) {
         const userProfile = await supabaseAPI.getUserProfile(response.user.id);
         setUser({
-          id: parseInt(userProfile.id),
+          id: userProfile.id,
           email: userProfile.email,
           username: userProfile.username,
           fullName: userProfile.full_name,
@@ -650,7 +650,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user) throw new Error('Not authenticated');
     
     try {
-      const response = await supabaseAPI.updateUserProfile(user.id.toString(), {
+      const response = await supabaseAPI.updateUserProfile(user.id, {
         full_name: updates.fullName,
         profile_picture_url: updates.profilePictureUrl,
         wallet_balance: updates.walletBalance,
@@ -679,7 +679,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     try {
       const newBalance = user.walletBalance + amount;
-      const response = await supabaseAPI.updateUserProfile(user.id.toString(), {
+      const response = await supabaseAPI.updateUserProfile(user.id, {
         wallet_balance: newBalance,
       });
       
@@ -735,6 +735,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Existing methods
     createParty,
     joinParty,
+    deleteParty,
     selectParty,
     submitVote,
     votePoll,

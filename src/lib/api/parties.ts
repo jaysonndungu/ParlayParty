@@ -29,7 +29,6 @@ export interface Party {
   buyIn?: number;
   prizePool?: number;
   allowedSports?: Sport[];
-  maxParticipants: number; // Always 16 for now
   currentParticipants: number;
   
   // QR Code for competitive parties
@@ -312,11 +311,6 @@ export const CreatePartyValidation = {
     minItems: 1,
     maxItems: 10,
     enum: ['NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'NCAAF', 'MLS', 'UFC'] as const
-  },
-  maxParticipants: {
-    required: false,
-    min: 2,
-    max: 100
   },
   evaluationLimit: {
     required: false,

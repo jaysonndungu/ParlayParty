@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView } from 'react-native';
+import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
@@ -43,6 +43,8 @@ export const PartiesScreen: React.FC = () => {
   const [inviteCode, setInviteCode] = useState<string>('');
   const [buyInConfirmed, setBuyInConfirmed] = useState<boolean>(false);
   const [tempBuyIn, setTempBuyIn] = useState<string>('');
+  const [showPartySettings, setShowPartySettings] = useState(false);
+  const [selectedPartyForSettings, setSelectedPartyForSettings] = useState<{id: string, name: string} | null>(null);
 
   // Removed sports selector - using default sports
 
@@ -196,6 +198,11 @@ export const PartiesScreen: React.FC = () => {
 
   // Removed sports selector
 
+  const handlePartySettings = (partyId: string, partyName: string) => {
+    setSelectedPartyForSettings({ id: partyId, name: partyName });
+    setShowPartySettings(true);
+  };
+
   const handleDeleteParty = async (partyId: string, partyName: string) => {
     console.log('Delete party requested:', { partyId, partyName, userId: user?.id });
     Alert.alert(
@@ -210,6 +217,8 @@ export const PartiesScreen: React.FC = () => {
             try {
               await deleteParty(partyId);
               Alert.alert('Success', 'Party deleted successfully');
+              setShowPartySettings(false);
+              setSelectedPartyForSettings(null);
             } catch (error) {
               console.error('Delete party error:', error);
               Alert.alert('Error', 'Failed to delete party');
@@ -399,9 +408,18 @@ export const PartiesScreen: React.FC = () => {
                   <Text style={{ color: colors.textMid, fontSize: 10, marginTop: 4, textAlign: 'center' }}>{status}</Text>
                 </View>
                 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Badge color={colors.chip}>{item.type}</Badge>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                {/* Party Type Badge */}
+                <View style={{ marginBottom: 8 }}>
+                  <Badge color={colors.chip}>
+                    <Text style={{ color: colors.textHigh, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
+                      {item.type}
+                    </Text>
+                  </Badge>
+                </View>
+                
+                {/* Action Buttons */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
                     <Button 
                       onPress={() => {
                         selectParty(item.id);
@@ -409,6 +427,7 @@ export const PartiesScreen: React.FC = () => {
                         // For now, we'll just select the party and user can manually go to chat
                       }}
                       variant="secondary"
+                      style={{ flex: 1, minWidth: 80 }}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600' }}>💬 Chat</Text>
                     </Button>
@@ -416,29 +435,24 @@ export const PartiesScreen: React.FC = () => {
                       onPress={() => selectParty(item.id)} 
                       disabled={item.id === selectedPartyId}
                       variant={item.id === selectedPartyId ? "secondary" : "primary"}
+                      style={{ flex: 1, minWidth: 80 }}
                     >
                       <Text style={{ fontSize: 12, fontWeight: '600' }}>
                         {item.id === selectedPartyId ? 'Current' : 'Open'}
                       </Text>
                     </Button>
-                    {/* Delete button - only show for party creator */}
-                    {user && item.createdBy === user.id && (
-                      <Button 
-                        onPress={() => handleDeleteParty(item.id, item.name)} 
-                        variant="secondary"
-                        style={{ backgroundColor: colors.error }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink }}>Delete</Text>
-                      </Button>
-                    )}
-                    {/* Debug info - remove this later */}
-                    {__DEV__ && (
-                      <Text style={{ color: colors.textLow, fontSize: 8 }}>
-                        Creator: {item.createdBy?.substring?.(0, 8) || 'N/A'} | User: {user?.id?.substring?.(0, 8) || 'N/A'}
-                      </Text>
-                    )}
                   </View>
+                  
+                  {/* Settings button - always show */}
+                  <Button 
+                    onPress={() => handlePartySettings(item.id, item.name)} 
+                    variant="secondary"
+                    style={{ backgroundColor: colors.steel, minWidth: 80 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600' }}>⚙️ Settings</Text>
+                  </Button>
                 </View>
+                
               </View>
             </Card>
           );
@@ -668,6 +682,72 @@ export const PartiesScreen: React.FC = () => {
             
             <Button variant='primary' onPress={() => setShowInviteCode(false)}>
               <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
+            </Button>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Party Settings Modal */}
+      <Modal visible={showPartySettings} transparent animationType='fade' onRequestClose={() => setShowPartySettings(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowPartySettings(false)}>
+          <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
+            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12, textAlign: 'center' }}>
+              Party Settings
+            </Text>
+            
+            <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>
+              {selectedPartyForSettings?.name}
+            </Text>
+            
+            <View style={{ gap: 12 }}>
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Party editing will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>✏️ Edit Party</Text>
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Member management will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>👥 Manage Members</Text>
+              </Button>
+              
+              <Button 
+                variant="secondary" 
+                onPress={() => {
+                  Alert.alert('Coming Soon', 'Party analytics will be available soon!');
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>📊 View Analytics</Text>
+              </Button>
+              
+              <Button 
+                variant="primary" 
+                onPress={() => {
+                  if (selectedPartyForSettings) {
+                    handleDeleteParty(selectedPartyForSettings.id, selectedPartyForSettings.name);
+                  }
+                }}
+                style={{ backgroundColor: colors.error }}
+              >
+                <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>
+                  🗑️ Delete Party
+                </Text>
+              </Button>
+            </View>
+            
+            <Button 
+              variant="secondary" 
+              onPress={() => setShowPartySettings(false)}
+              style={{ marginTop: 16 }}
+            >
+              <Text style={{ fontSize: 14 }}>Close</Text>
             </Button>
           </Pressable>
         </Pressable>
