@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { useStore } from '@/store/AppStore';
 import { Badge, Card } from '@/components/ui';
@@ -8,8 +9,9 @@ export const MyPollsScreen: React.FC = () => {
   const { myPolls } = useStore();
   
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, padding: spacing(2) }}>
-      <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700', marginBottom: spacing(2) }}>My Polls</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
+      <View style={{ flex: 1, padding: spacing(2) }}>
+        <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700', marginBottom: spacing(2) }}>My Polls</Text>
       
       <Card style={{ backgroundColor: colors.slate, borderColor: colors.steel, borderWidth: 1, borderRadius: 12 }}>
         <View style={{ padding: 16 }}>
@@ -51,6 +53,7 @@ export const MyPollsScreen: React.FC = () => {
           />
         </View>
       </Card>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
