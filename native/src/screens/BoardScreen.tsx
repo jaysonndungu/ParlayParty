@@ -36,6 +36,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [showGameDropdown, setShowGameDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [joshAllenChoice, setJoshAllenChoice] = useState<'over' | 'under' | null>(null);
 
   const avatarUrl = (name: string) => {
     const seed = encodeURIComponent(name);
@@ -275,57 +276,94 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
 
   const renderPickOfDay = () => (
     <Card style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
-          <View style={{ padding: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>⭐ Pick of the Day</Text>
-              <Badge color={colors.chip}>
-                <Text style={{ fontSize: 10 }}>⭐ Streak {podStreak}</Text>
-              </Badge>
-            </View>
-            
-        {pickOfDay ? (
-          <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ color: colors.textMid, fontSize: 14 }}>{pickOfDay.league} • {pickOfDay.game}</Text>
-              <Badge color={colors.chip}>{pickOfDay.prop}</Badge>
-            </View>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View>
-                <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>{pickOfDay.player}</Text>
-                <Text style={{ color: colors.textLow, fontSize: 12 }}>Line {pickOfDay.line}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button 
-                  disabled={!!podChoice} 
-                  onPress={() => handlePodPick("over")} 
-                  style={{ backgroundColor: colors.mint }}
-                >
-                  <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Over</Text>
-                </Button>
-                <Button 
-                  disabled={!!podChoice} 
-                  onPress={() => handlePodPick("under")} 
-                  variant="secondary"
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '600' }}>Under</Text>
-                </Button>
-              </View>
-            </View>
-            
-            {podChoice && (
-              <Text style={{ color: colors.textMid, fontSize: 12 }}>
-                You picked {podChoice.toUpperCase()} {pickOfDay.resolved ? 
-                  (pickOfDay.correct === podChoice ? "• Correct! +12" : "• Missed") : 
-                  "• Resolving..."
-                }
-              </Text>
-            )}
-          </>
-        ) : (
-          <Text style={{ color: colors.textMid, fontSize: 14, textAlign: 'center' }}>
-            No pick of the day available
+      <View style={{ padding: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>⭐ Pick of the Day</Text>
+          <Badge color={colors.error}>
+            <Text style={{ fontSize: 10, color: '#fff' }}>⭐ Streak 2</Text>
+          </Badge>
+        </View>
+        
+        {/* Points Info */}
+        <View style={{ backgroundColor: colors.chip, padding: 8, borderRadius: 8, marginBottom: 12 }}>
+          <Text style={{ color: colors.textMid, fontSize: 11, textAlign: 'center' }}>
+            🏆 40 points + streak bonus
           </Text>
+        </View>
+        
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ color: colors.textMid, fontSize: 14 }}>NFL • PHI @ DAL</Text>
+          <Badge color={colors.chip}>Passing Yds</Badge>
+        </View>
+        
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <View>
+            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Jalen Hurts</Text>
+            <Text style={{ color: colors.textLow, fontSize: 12 }}>Line 219.5</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button 
+              disabled={!!joshAllenChoice}
+              onPress={() => setJoshAllenChoice('over')}
+              style={{ backgroundColor: colors.mint }}
+            >
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Over</Text>
+            </Button>
+            <Button 
+              disabled={!!joshAllenChoice}
+              onPress={() => setJoshAllenChoice('under')}
+              variant="secondary"
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600' }}>Under</Text>
+            </Button>
+          </View>
+        </View>
+        
+        {joshAllenChoice && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ color: colors.textHigh, fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
+              You selected Jalen Hurts {joshAllenChoice} 219.5 yards
+            </Text>
+            
+            {/* Game Tracker */}
+            <View style={{ backgroundColor: colors.chip, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.steel }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ color: colors.textMid, fontSize: 12 }}>Game Tracker</Text>
+                <Text style={{ color: colors.textHigh, fontSize: 12, fontWeight: '600' }}>
+                  Sunday 1pm
+                </Text>
+              </View>
+              
+              <View style={{ width: '100%', height: 8, backgroundColor: colors.steel, borderRadius: 4, marginBottom: 8, position: 'relative' }}>
+                <View 
+                  style={{
+                    height: '100%',
+                    backgroundColor: colors.steel,
+                    width: '100%',
+                    borderRadius: 4
+                  }}
+                />
+                <View style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: -2,
+                  width: 2,
+                  height: 12,
+                  backgroundColor: colors.textHigh
+                }} />
+                <Text style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 10,
+                  color: colors.textHigh,
+                  fontSize: 10,
+                  fontWeight: '600'
+                }}>
+                  219.5
+                </Text>
+              </View>
+            </View>
+          </View>
         )}
       </View>
     </Card>
