@@ -10,6 +10,7 @@ import { ProphetPoll, Poll } from "@/components/ProphetPoll";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Trophy, Users2, ListOrdered, MessageSquare, Menu, Star, Eye } from "lucide-react";
 import Image from "next/image";
+import { DateRangePicker, validateDateRange } from "@/components/ui/date-picker";
 // ... keep existing imports ...
 // add dialog + form controls
 import {
@@ -222,6 +223,10 @@ export default function Home() {
   const [createError, setCreateError] = useState<string>("");
   // add-to-pool amount input
   const [addPoolAmount, setAddPoolAmount] = useState<string>("");
+  // invite code display
+  const [showInviteCode, setShowInviteCode] = useState(false);
+  const [createdParty, setCreatedParty] = useState<any>(null);
+  const [inviteCode, setInviteCode] = useState<string>("");
 
   // Pick of the Day state
   type PickOfDay = { id: string; league: string; player: string; prop: string; line: number; game: string; resolved?: boolean; correct?: "over" | "under" } | null;
@@ -325,76 +330,6 @@ export default function Home() {
     }, 2500);
   }, [me]);
 
-  // seed demo parties once
-  useEffect(() => {
-    if (myParties.length > 0) return;
-    const friendly: Party = { id: "p_friendly", name: "Sunday Sweats", type: "friendly", startDate: "2024-01-01", endDate: "2024-01-31" };
-    const comp: Party = { id: "p_comp", name: "Competitive Party", type: "competitive", startDate: "2024-02-01", endDate: "2024-02-28" };
-    const seeded = [friendly, comp];
-    setMyParties(seeded);
-    // scores
-    setPartyScores({ p_friendly: { ...initialScores }, p_comp: { ...initialScores } });
-    // seed picks per party
-    const mkPick = (override?: Partial<PartyPick>): PartyPick => ({
-      id: Math.random().toString(36).slice(2),
-      game: ["SF @ DAL","KC @ BUF","PHI @ NYG","MIA @ NE"][Math.floor(Math.random()*4)],
-      line: Math.random() > 0.5 ? `o/u ${(40 + Math.floor(Math.random()*12)+0.5).toFixed(1)}` : `TT o${(20 + Math.floor(Math.random()*12)+0.5).toFixed(1)}`,
-      score: `${20+Math.floor(Math.random()*15)}-${17+Math.floor(Math.random()*15)}`,
-      clock: `Q${3+Math.floor(Math.random()*2)} ${String(Math.floor(Math.random()*7)).padStart(2,"0")}:${String(Math.floor(Math.random()*60)).padStart(2,"0")}`,
-      minsLeft: 5 + Math.floor(Math.random()*20),
-      takers: Array.from(new Set([USERS[Math.floor(Math.random()*USERS.length)], USERS[Math.floor(Math.random()*USERS.length)]])),
-      isClutch: Math.random() > 0.7,
-      // Set each pick's lock to a unique future time (5–90 mins from now)
-      startAtMs: Date.now() + (5 + Math.floor(Math.random()*86)) * 60_000,
-      ...override,
-    });
-    setPartyPicks({
-      // Rich dummy data: mix of live and upcoming picks for me + friends
-      p_friendly: (() => {
-        const nowMs = Date.now();
-        const arr: PartyPick[] = [];
-        // My upcoming picks (so I can choose Parlay of the Day)
-        arr.push(
-          mkPick({ takers: [USERS[0], USERS[2]], startAtMs: nowMs + 25 * 60_000, isClutch: false }),
-          mkPick({ takers: [USERS[0]], startAtMs: nowMs + 45 * 60_000, isClutch: false }),
-        );
-        // Friends upcoming
-        arr.push(
-          mkPick({ takers: [USERS[1]], startAtMs: nowMs + 15 * 60_000 }),
-          mkPick({ takers: [USERS[3], USERS[6]], startAtMs: nowMs + 55 * 60_000 }),
-        );
-        // Live legs (already started)
-        arr.push(
-          mkPick({ takers: [USERS[4], USERS[5]], startAtMs: nowMs - 30 * 60_000, isClutch: true, minsLeft: 3 }),
-          mkPick({ takers: [USERS[2]], startAtMs: nowMs - 10 * 60_000 }),
-          mkPick({ takers: [USERS[7], USERS[0]], startAtMs: nowMs - 5 * 60_000, isClutch: Math.random() > 0.6 }),
-        );
-        // Extra variety
-        arr.push(
-          mkPick({ takers: [USERS[5]], startAtMs: nowMs + 5 * 60_000 }),
-          mkPick({ takers: [USERS[6], USERS[1]], startAtMs: nowMs + 80 * 60_000 }),
-        );
-        return arr;
-      })(),
-      p_comp: (() => {
-        const nowMs = Date.now();
-        const arr: PartyPick[] = [];
-        // Competitive party: heavier live action and a clutch anchor
-        arr.push(
-          mkPick({ takers: [USERS[3]], startAtMs: nowMs - 35 * 60_000, isClutch: true, minsLeft: 1 }),
-          mkPick({ takers: [USERS[1], USERS[4]], startAtMs: nowMs - 20 * 60_000 }),
-          mkPick({ takers: [USERS[0]], startAtMs: nowMs + 20 * 60_000 }),
-          mkPick({ takers: [USERS[7]], startAtMs: nowMs + 60 * 60_000 }),
-          mkPick({ takers: [USERS[2], USERS[5]], startAtMs: nowMs - 8 * 60_000 }),
-          mkPick({ takers: [USERS[6]], startAtMs: nowMs + 10 * 60_000 }),
-          mkPick({ takers: [USERS[4]], startAtMs: nowMs + 40 * 60_000 }),
-        );
-        return arr;
-      })(),
-    });
-    setSelectedPartyId("p_friendly");
-    setActiveTab("game");
-  }, [myParties.length]);
 
   // when switching selected party, hydrate scoped state
   useEffect(() => {
@@ -583,32 +518,32 @@ export default function Home() {
 
   // create party handler
   const createParty = () => {
-    // validate dates
+    // validate dates using new validation
     setDateError("");
     setCreateError("");
-    if (!newPartyStart || !newPartyEnd) {
-      setDateError("Please select a start and end date");
-      return;
-    }
-    const start = new Date(newPartyStart);
-    const end = new Date(newPartyEnd);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      setDateError("Invalid dates");
-      return;
-    }
-    if (end < start) {
-      setDateError("End date must be after start date");
-      return;
-    }
-    const msInYear = 365 * 24 * 60 * 60 * 1000;
-    if (end.getTime() - start.getTime() > msInYear) {
-      setDateError("Maximum duration is 1 year");
+    const dateValidation = validateDateRange(newPartyStart, newPartyEnd);
+    if (!dateValidation.isValid) {
+      setDateError(dateValidation.errors.join(', '));
       return;
     }
 
     const id = Math.random().toString(36).slice(2);
     const defaultName = newPartyType === "friendly" ? "Friendly Party" : "Competitive Party";
-    const p: Party = { id, name: newPartyName.trim() || defaultName, type: newPartyType, startDate: newPartyStart, endDate: newPartyEnd };
+    
+    // Generate invite code
+    const generatedInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    const p: Party = { 
+      id, 
+      name: newPartyName.trim() || defaultName, 
+      type: newPartyType, 
+      startDate: newPartyStart, 
+      endDate: newPartyEnd,
+      joinCode: generatedInviteCode,
+      maxParticipants: 16,
+      currentParticipants: 1,
+      members: []
+    };
     // competitive validations + wallet charge
     if (newPartyType === "competitive") {
       if (!newBuyIn || newBuyIn <= 0) {
@@ -636,6 +571,17 @@ export default function Home() {
       setPartyBuyIns((m) => ({ ...m, [id]: newBuyIn }));
       setPartyAllowedSports((m) => ({ ...m, [id]: [...newAllowedSports] }));
     }
+    
+    // Show invite code
+    setInviteCode(generatedInviteCode);
+    setCreatedParty({
+      name: p.name,
+      type: p.type,
+      joinCode: generatedInviteCode,
+      maxParticipants: 16,
+      currentParticipants: 1
+    });
+    setShowInviteCode(true);
     setSelectedPartyId(id);
     setOpenCreate(false);
     setPartyModalMode("create");
@@ -1018,16 +964,14 @@ export default function Home() {
                             </div>
                           </div>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <Label>Start date</Label>
-                            <Input type="date" value={newPartyStart} onChange={(e)=>setNewPartyStart(e.target.value)} />
-                          </div>
-                          <div>
-                            <Label>End date</Label>
-                            <Input type="date" value={newPartyEnd} onChange={(e)=>setNewPartyEnd(e.target.value)} />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          startDate={newPartyStart}
+                          endDate={newPartyEnd}
+                          onStartDateChange={setNewPartyStart}
+                          onEndDateChange={setNewPartyEnd}
+                          startDateError={dateError}
+                          endDateError={dateError}
+                        />
                         {dateError && <p className="text-xs text-[color:var(--error)]">{dateError}</p>}
                         {createError && <p className="text-xs text-[color:var(--error)]">{createError}</p>}
                         <Button onClick={createParty} className="bg-[color:var(--pp-purple)] text-black">Create</Button>
@@ -1056,6 +1000,54 @@ export default function Home() {
                         <Button onClick={joinParty} className="bg-[color:var(--pp-purple)] text-black">Join</Button>
                       </>
                     )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Invite Code Display Modal */}
+              <Dialog open={showInviteCode} onOpenChange={setShowInviteCode}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Party Created Successfully!</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Share this invite code with friends to let them join your party:
+                    </p>
+                    
+                    <div className="bg-gray-100 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold tracking-wider text-gray-900">
+                        {inviteCode}
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 text-center">
+                      Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigator.clipboard.writeText(inviteCode)}
+                      >
+                        Copy Code
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${inviteCode}`)}
+                      >
+                        Copy Link
+                      </Button>
+                    </div>
+                    
+                    <Button 
+                      onClick={() => setShowInviteCode(false)} 
+                      className="w-full bg-[color:var(--pp-purple)] text-black"
+                    >
+                      Got it!
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>

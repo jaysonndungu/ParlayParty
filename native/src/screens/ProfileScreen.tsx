@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, Image, Pressable, ScrollView, Alert } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
 import { useStore } from '@/store/AppStore';
+import * as ImagePicker from 'expo-image-picker';
 
 export const ProfileScreen: React.FC = () => {
   const { 
@@ -14,10 +15,17 @@ export const ProfileScreen: React.FC = () => {
     myPolls, 
     wallet,
     addWalletFunds,
-    authLoading 
+    authLoading,
+    updateProfile,
+    setProfilePhotoUrl
   } = useStore();
   
   const [showAddFunds, setShowAddFunds] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -41,6 +49,82 @@ export const ProfileScreen: React.FC = () => {
       setShowAddFunds(false);
     } catch (error) {
       Alert.alert('Error', 'Failed to add funds');
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setProfilePhotoUrl(imageUri);
+        Alert.alert('Success', 'Profile photo updated!');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setProfilePhotoUrl(imageUri);
+        Alert.alert('Success', 'Profile photo updated!');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const showImagePicker = () => {
+    Alert.alert(
+      'Update Profile Photo',
+      'Choose how you want to update your profile photo',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Library', onPress: pickImage },
+      ]
+    );
+  };
+
+  const handleEditProfile = () => {
+    if (!user) return;
+    setEditFullName(user.fullName);
+    setEditUsername(user.username);
+    setEditEmail(user.email);
+    setShowEditProfile(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    
+    setIsUpdatingProfile(true);
+    try {
+      await updateProfile({
+        fullName: editFullName,
+        username: editUsername,
+        email: editEmail,
+      });
+      Alert.alert('Success', 'Profile updated successfully!');
+      setShowEditProfile(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -76,10 +160,27 @@ export const ProfileScreen: React.FC = () => {
       {/* Profile Header */}
       <Card style={{ backgroundColor: colors.slate, borderColor: colors.steel, borderWidth: 1, borderRadius: 12, marginBottom: spacing(2) }}>
         <View style={{ padding: 20, alignItems: 'center' }}>
-          <Image 
-            source={{ uri: avatarUrl(user.fullName) }} 
-            style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 16 }} 
-          />
+          <Pressable onPress={showImagePicker}>
+            <Image 
+              source={{ uri: user.profilePhotoUrl || avatarUrl(user.fullName) }} 
+              style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 16 }} 
+            />
+            <View style={{
+              position: 'absolute',
+              bottom: 12,
+              right: 0,
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: colors.primary,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderWidth: 2,
+              borderColor: colors.slate
+            }}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>+</Text>
+            </View>
+          </Pressable>
           
           <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', marginBottom: 4 }}>
             {user.fullName}
@@ -289,7 +390,7 @@ export const ProfileScreen: React.FC = () => {
           <View style={{ gap: 12 }}>
             <Button 
               variant="secondary" 
-              onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon!')}
+              onPress={handleEditProfile}
             >
               <Text style={{ fontSize: 14 }}>Edit Profile</Text>
             </Button>
@@ -320,6 +421,118 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </View>
       </Card>
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: spacing(3)
+        }}>
+          <Card style={{ 
+            backgroundColor: colors.slate, 
+            borderColor: colors.steel, 
+            borderWidth: 1, 
+            borderRadius: 12, 
+            width: '100%',
+            maxWidth: 400
+          }}>
+            <View style={{ padding: 20 }}>
+              <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' }}>
+                Edit Profile
+              </Text>
+              
+              <View style={{ gap: 16 }}>
+                <View>
+                  <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 6 }}>Full Name</Text>
+                  <TextInput
+                    value={editFullName}
+                    onChangeText={setEditFullName}
+                    style={{
+                      color: colors.textHigh,
+                      borderColor: colors.steel,
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: 12,
+                      backgroundColor: colors.chip,
+                      fontSize: 16
+                    }}
+                    placeholder="Enter your full name"
+                    placeholderTextColor={colors.textLow}
+                  />
+                </View>
+                
+                <View>
+                  <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 6 }}>Username</Text>
+                  <TextInput
+                    value={editUsername}
+                    onChangeText={setEditUsername}
+                    style={{
+                      color: colors.textHigh,
+                      borderColor: colors.steel,
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: 12,
+                      backgroundColor: colors.chip,
+                      fontSize: 16
+                    }}
+                    placeholder="Enter your username"
+                    placeholderTextColor={colors.textLow}
+                  />
+                </View>
+                
+                <View>
+                  <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 6 }}>Email</Text>
+                  <TextInput
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    style={{
+                      color: colors.textHigh,
+                      borderColor: colors.steel,
+                      borderWidth: 1,
+                      borderRadius: 8,
+                      padding: 12,
+                      backgroundColor: colors.chip,
+                      fontSize: 16
+                    }}
+                    placeholder="Enter your email"
+                    placeholderTextColor={colors.textLow}
+                  />
+                </View>
+              </View>
+              
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+                <Button 
+                  variant="secondary" 
+                  onPress={() => setShowEditProfile(false)}
+                  style={{ flex: 1 }}
+                >
+                  <Text style={{ fontSize: 14 }}>Cancel</Text>
+                </Button>
+                
+                <Button 
+                  variant="primary" 
+                  onPress={handleSaveProfile}
+                  disabled={isUpdatingProfile}
+                  style={{ flex: 1, opacity: isUpdatingProfile ? 0.5 : 1 }}
+                >
+                  <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>
+                    {isUpdatingProfile ? 'Saving...' : 'Save Changes'}
+                  </Text>
+                </Button>
+              </View>
+            </View>
+          </Card>
+        </View>
+      )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -639,15 +639,65 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         borderBottomWidth: 1,
         borderBottomColor: colors.steel
       }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '800' }}>
-            {currentParty?.name ?? 'ParlayParty'}
-          </Text>
-          {currentParty && (
-            <Text style={{ color: colors.textMid, fontSize: 12, textTransform: 'capitalize' }}>
-              {currentParty.type} party
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ 
+            width: 50, 
+            height: 50, 
+            justifyContent: 'center', 
+            alignItems: 'center' 
+          }}>
+            {/* Group of people icon */}
+            <View style={{ position: 'relative', width: 40, height: 30 }}>
+              {/* Main person (foreground) */}
+              <View style={{
+                position: 'absolute',
+                left: 8,
+                top: 5,
+                width: 12,
+                height: 20,
+                backgroundColor: colors.primary,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: '#000'
+              }} />
+              {/* Person behind left */}
+              <View style={{
+                position: 'absolute',
+                left: 2,
+                top: 8,
+                width: 10,
+                height: 16,
+                backgroundColor: colors.primary,
+                borderRadius: 5,
+                borderWidth: 1,
+                borderColor: '#000',
+                opacity: 0.8
+              }} />
+              {/* Person behind right */}
+              <View style={{
+                position: 'absolute',
+                left: 18,
+                top: 8,
+                width: 10,
+                height: 16,
+                backgroundColor: colors.primary,
+                borderRadius: 5,
+                borderWidth: 1,
+                borderColor: '#000',
+                opacity: 0.8
+              }} />
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '800' }}>
+              {currentParty?.name ?? 'ParlayParty'}
             </Text>
-          )}
+            {currentParty && (
+              <Text style={{ color: colors.textMid, fontSize: 12, textTransform: 'capitalize' }}>
+                {currentParty.type} party
+              </Text>
+            )}
+          </View>
         </View>
         
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
