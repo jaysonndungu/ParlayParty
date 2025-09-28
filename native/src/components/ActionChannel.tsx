@@ -6,47 +6,89 @@ import { Card, Badge, Button } from '@/components/ui';
 
 export const ActionChannel: React.FC = () => {
   const { events, clutch } = useStore();
-  const topEvents = [...events].sort((a, b) => b.priority - a.priority).slice(0, 6);
+  
+  // Always show 3 live legs with realistic data
+  const liveLegs = [
+    {
+      id: '1',
+      game: 'KC @ BUF',
+      time: 'Q2 8:32',
+      score: '14-7',
+      player: 'Patrick Mahomes',
+      bet: 'Over 2.5 Passing TDs',
+      current: 2,
+      total: 2.5,
+      progress: 80
+    },
+    {
+      id: '2', 
+      game: 'SF @ DAL',
+      time: 'Q1 12:15',
+      score: '0-3',
+      player: 'Christian McCaffrey',
+      bet: 'Over 85.5 Rushing Yds',
+      current: 23,
+      total: 85.5,
+      progress: 27
+    },
+    {
+      id: '3',
+      game: 'MIA @ NE', 
+      time: 'Q3 4:22',
+      score: '21-17',
+      player: 'Tua Tagovailoa',
+      bet: 'Over 240.5 Passing Yds',
+      current: 189,
+      total: 240.5,
+      progress: 79
+    }
+  ];
 
   return (
     <Card style={{ backgroundColor: colors.slate, borderColor: colors.steel, borderWidth: 1, borderRadius: 12 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.steel }}>
         <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Action Channel</Text>
-        <Badge color={colors.primary}>Live</Badge>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Badge color={colors.primary}>Live</Badge>
+          <Button 
+            variant="secondary"
+            onPress={() => {/* Navigate to View All page */}}
+            style={{ paddingHorizontal: 12, paddingVertical: 4 }}
+          >
+            <Text style={{ color: colors.textHigh, fontSize: 12, fontWeight: '600' }}>View All</Text>
+          </Button>
+        </View>
       </View>
       <View style={{ padding: 16 }}>
-        {topEvents.map((item) => (
+        {liveLegs.map((leg) => (
           <View 
-            key={item.id}
+            key={leg.id}
             style={{ 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
-              alignItems: 'flex-start', 
-              gap: 12, 
-              padding: 12, 
               backgroundColor: colors.chip, 
               borderWidth: 1, 
               borderColor: colors.steel, 
               borderRadius: 12, 
-              marginBottom: 8 
+              marginBottom: 12,
+              padding: 12
             }}
           >
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Text style={{ color: item.priority >= 9 ? colors.gold : colors.primary, fontSize: 16 }}>⚡</Text>
-                <Text style={{ color: colors.textLow, fontSize: 12 }}>{item.game} • {item.user}</Text>
-              </View>
-              <Text style={{ color: colors.textHigh, fontSize: 14 }}>{item.text}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.textLow, fontSize: 12 }}>{leg.game} • {leg.time} • {leg.score}</Text>
+              <Text style={{ color: colors.textHigh, fontSize: 14, fontWeight: '600' }}>{leg.current}/{leg.total}</Text>
             </View>
-            {item.isClutch && (
-              <Button 
-                variant="primary" 
-                onPress={() => {/* Handle clutch focus */}}
-                style={{ backgroundColor: colors.gold }}
-              >
-                <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Clutch Time</Text>
-              </Button>
-            )}
+            <Text style={{ color: colors.textHigh, fontSize: 14, marginBottom: 8 }}>
+              {leg.player} {leg.bet}
+            </Text>
+            <View style={{ width: '100%', backgroundColor: colors.steel, borderRadius: 4, height: 6 }}>
+              <View 
+                style={{ 
+                  width: `${leg.progress}%`, 
+                  backgroundColor: leg.progress >= 80 ? colors.mint : colors.primary, 
+                  borderRadius: 4, 
+                  height: 6 
+                }} 
+              />
+            </View>
           </View>
         ))}
       </View>

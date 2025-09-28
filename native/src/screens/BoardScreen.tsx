@@ -8,6 +8,7 @@ import { ProphetPoll } from '@/components/ProphetPoll';
 import { ActionChannel } from '@/components/ActionChannel';
 import { PartyChat } from '@/components/PartyChat';
 import { BackendTestComponent } from '@/components/BackendTestComponent';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface BoardScreenProps {
   navigation: any;
@@ -39,7 +40,115 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [showGameDropdown, setShowGameDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [joshAllenChoice, setJoshAllenChoice] = useState<'over' | 'under' | null>(null);
+  const [selectedParlayId, setSelectedParlayId] = useState<string | null>(null);
+  const [dailyParlaySelection, setDailyParlaySelection] = useState<{parlayId: string, action: 'tail' | 'fade'} | null>(null);
+
+  // Load daily parlay selection on mount
+  useEffect(() => {
+    const loadDailySelection = async () => {
+      try {
+        const today = new Date().toDateString();
+        const stored = await AsyncStorage.getItem(`daily_parlay_${today}`);
+        if (stored) {
+          const selection = JSON.parse(stored);
+          setDailyParlaySelection(selection);
+        }
+      } catch (error) {
+        console.error('Error loading daily selection:', error);
+      }
+    };
+
+    loadDailySelection();
+  }, []);
+
+  // Generate random parlays for party members
+  const generateUserParlays = () => {
+    if (!currentParty?.members) return [];
+    
+    const allGeneratedParlays = [];
+    
+    currentParty.members.forEach((member, memberIndex) => {
+      // Generate 1-3 parlays per user
+      const numParlays = Math.floor(Math.random() * 3) + 1;
+      
+      for (let i = 0; i < numParlays; i++) {
+        const parlayId = `user-${memberIndex}-parlay-${i}`;
+        
+        // Generate 2-6 legs per parlay
+        const numLegs = Math.floor(Math.random() * 5) + 2;
+        const picks = [];
+        
+        // Sample games and players for KC @ BUF
+        const games = ['KC @ BUF'];
+        const players = [
+          { name: 'Patrick Mahomes', props: ['Passing Yds', 'Passing TDs', 'Rushing Yds'] },
+          { name: 'Josh Allen', props: ['Passing Yds', 'Passing TDs', 'Rushing Yds'] },
+          { name: 'Travis Kelce', props: ['Receptions', 'Receiving Yds', 'Receiving TDs'] },
+          { name: 'Stefon Diggs', props: ['Receptions', 'Receiving Yds', 'Receiving TDs'] },
+          { name: 'James Cook', props: ['Rushing Yds', 'Rushing TDs', 'Receptions'] },
+          { name: 'Isiah Pacheco', props: ['Rushing Yds', 'Rushing TDs', 'Receptions'] },
+          { name: 'Game Total', props: ['Points'] }
+        ];
+        
+        for (let j = 0; j < numLegs; j++) {
+          const game = games[Math.floor(Math.random() * games.length)];
+          const player = players[Math.floor(Math.random() * players.length)];
+          const prop = player.props[Math.floor(Math.random() * player.props.length)];
+          
+          let line = '';
+          if (prop === 'Passing Yds') line = (Math.floor(Math.random() * 100) + 200).toFixed(1);
+          else if (prop === 'Passing TDs') line = (Math.floor(Math.random() * 2) + 1).toFixed(1);
+          else if (prop === 'Rushing Yds') line = (Math.floor(Math.random() * 60) + 30).toFixed(1);
+          else if (prop === 'Receptions') line = (Math.floor(Math.random() * 8) + 3).toFixed(1);
+          else if (prop === 'Receiving Yds') line = (Math.floor(Math.random() * 80) + 40).toFixed(1);
+          else if (prop === 'Receiving TDs') line = (Math.floor(Math.random() * 2) + 0.5).toFixed(1);
+          else if (prop === 'Rushing TDs') line = (Math.floor(Math.random() * 2) + 0.5).toFixed(1);
+          else if (prop === 'Points') line = (Math.floor(Math.random() * 20) + 40).toFixed(1);
+          
+          const overUnder = Math.random() > 0.5 ? 'Over' : 'Under';
+          const bet = `${player.name} ${overUnder} ${line} ${prop}`;
+          
+          picks.push({
+            game,
+            bet,
+            status: 'live'
+          });
+        }
+        
+        // Generate odds based on number of legs
+        const baseOdds = numLegs * 100 + Math.floor(Math.random() * 200);
+        const odds = `+${baseOdds}`;
+        
+        allGeneratedParlays.push({
+          id: parlayId,
+          user: member.name || member.username || `User ${memberIndex + 1}`,
+          picks,
+          odds,
+          status: 'live'
+        });
+      }
+    });
+    
+    return allGeneratedParlays;
+  };
+
+  const handleTailFade = async (parlayId: string, action: 'tail' | 'fade') => {
+    try {
+      // Save to AsyncStorage for persistence across app sessions
+      const today = new Date().toDateString();
+      await AsyncStorage.setItem(`daily_parlay_${today}`, JSON.stringify({ parlayId, action }));
+      
+      // Set the daily parlay selection for immediate UI update
+      setDailyParlaySelection({ parlayId, action });
+      setSelectedParlayId(null);
+      
+      // Navigate to My Polls tab to show the selection
+      // This will be handled by the parent navigation
+    } catch (error) {
+      console.error('Error saving daily selection:', error);
+    }
+  };
+
   
   // Make liveLegs and allParlays stateful so simulation can update them
   // Dummy data should be ONE game with 2 teams and 2 player props
@@ -71,6 +180,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   ]);
 
   const [allParlays, setAllParlays] = useState([
+    // Riley's Parlays (2 parlays)
     {
       id: '1',
       user: 'Riley',
@@ -79,6 +189,112 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         { game: 'KC @ BUF', bet: 'Josh Allen Over 250.5 Passing Yards', status: 'live' }
       ],
       odds: '+280',
+      status: 'live'
+    },
+    {
+      id: '2',
+      user: 'Riley',
+      picks: [
+        { game: 'SF @ DAL', bet: 'Brock Purdy Over 1.5 Passing TDs', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Christian McCaffrey Under 85.5 Rushing Yards', status: 'live' },
+        { game: 'SF @ DAL', bet: 'George Kittle Over 5.5 Receptions', status: 'live' }
+      ],
+      odds: '+520',
+      status: 'live'
+    },
+    // Alex's Parlays (2 parlays)
+    {
+      id: '3',
+      user: 'Alex',
+      picks: [
+        { game: 'KC @ BUF', bet: 'Travis Kelce Over 6.5 Receptions', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Stefon Diggs Under 85.5 Receiving Yards', status: 'live' }
+      ],
+      odds: '+320',
+      status: 'live'
+    },
+    {
+      id: '4',
+      user: 'Alex',
+      picks: [
+        { game: 'SF @ DAL', bet: 'Dak Prescott Over 275.5 Passing Yards', status: 'live' },
+        { game: 'SF @ DAL', bet: 'CeeDee Lamb Over 7.5 Receptions', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Tony Pollard Under 70.5 Rushing Yards', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Game Total Over 48.5 Points', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Brandon Aiyuk Under 60.5 Receiving Yards', status: 'live' }
+      ],
+      odds: '+1200',
+      status: 'live'
+    },
+    // Jordan's Parlays (2 parlays)
+    {
+      id: '5',
+      user: 'Jordan',
+      picks: [
+        { game: 'KC @ BUF', bet: 'Josh Allen Over 1.5 Passing TDs', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Patrick Mahomes Under 275.5 Passing Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'James Cook Over 45.5 Rushing Yards', status: 'live' }
+      ],
+      odds: '+450',
+      status: 'live'
+    },
+    {
+      id: '6',
+      user: 'Jordan',
+      picks: [
+        { game: 'SF @ DAL', bet: 'Christian McCaffrey Over 85.5 Rushing Yards', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Brock Purdy Under 1.5 Passing TDs', status: 'live' }
+      ],
+      odds: '+280',
+      status: 'live'
+    },
+    // Sam's Parlays (2 parlays)
+    {
+      id: '7',
+      user: 'Sam',
+      picks: [
+        { game: 'KC @ BUF', bet: 'Isiah Pacheco Over 35.5 Rushing Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Travis Kelce Under 5.5 Receptions', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Game Total Under 52.5 Points', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Stefon Diggs Over 7.5 Receptions', status: 'live' }
+      ],
+      odds: '+680',
+      status: 'live'
+    },
+    {
+      id: '8',
+      user: 'Sam',
+      picks: [
+        { game: 'SF @ DAL', bet: 'George Kittle Over 5.5 Receptions', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Dak Prescott Over 275.5 Passing Yards', status: 'live' }
+      ],
+      odds: '+320',
+      status: 'live'
+    },
+    // Taylor's Parlays (2 parlays)
+    {
+      id: '9',
+      user: 'Taylor',
+      picks: [
+        { game: 'KC @ BUF', bet: 'Josh Allen Over 45.5 Rushing Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Patrick Mahomes Over 2.5 Passing TDs', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Stefon Diggs Over 100.5 Receiving Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Travis Kelce Over 80.5 Receiving Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'James Cook Under 45.5 Rushing Yards', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Game Total Over 52.5 Points', status: 'live' }
+      ],
+      odds: '+1500',
+      status: 'live'
+    },
+    {
+      id: '10',
+      user: 'Taylor',
+      picks: [
+        { game: 'SF @ DAL', bet: 'Christian McCaffrey Under 85.5 Rushing Yards', status: 'live' },
+        { game: 'SF @ DAL', bet: 'Brock Purdy Over 1.5 Passing TDs', status: 'live' },
+        { game: 'SF @ DAL', bet: 'CeeDee Lamb Under 80.5 Receiving Yards', status: 'live' }
+      ],
+      odds: '+380',
       status: 'live'
     }
   ]);
@@ -124,21 +340,8 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
       
       setLiveLegs(newLiveLegs);
       
-      // Update all parlays with simulation data
-      const newAllParlays = [
-        {
-          id: 'sim_parlay',
-          user: 'AI Simulation',
-          picks: [
-            { game: gameString, bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`, status: 'live' },
-            { game: gameString, bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`, status: 'live' }
-          ],
-          odds: '+450',
-          status: 'live'
-        }
-      ];
-      
-      setAllParlays(newAllParlays);
+      // Keep the hardcoded parlays and don't override them
+      // The simulation will only update the live legs section
     } else if (!simulation.isRunning && simulation.currentGame && simulation.playerAStats && simulation.playerBStats) {
       // Show final results when simulation ends
       const gameString = `${simulation.currentGame.teamA.abbreviation} @ ${simulation.currentGame.teamB.abbreviation}`;
@@ -188,21 +391,8 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
       
       setLiveLegs(newLiveLegs);
       
-      // Update all parlays with final results
-      const newAllParlays = [
-        {
-          id: 'sim_parlay',
-          user: 'AI Simulation',
-          picks: [
-            { game: gameString, bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`, status: playerAOutcome === 'CASH!' ? 'win' : 'loss' },
-            { game: gameString, bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`, status: playerBOutcome === 'CASH!' ? 'win' : 'loss' }
-          ],
-          odds: '+450',
-          status: 'final'
-        }
-      ];
-      
-      setAllParlays(newAllParlays);
+      // Keep the hardcoded parlays and don't override them
+      // The simulation will only update the live legs section
     } else if (!simulation.isRunning && simulation.currentGame === null) {
       // Reset to original dummy data when simulation stops
       setLiveLegs([
@@ -232,18 +422,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         }
       ]);
       
-      setAllParlays([
-        {
-          id: '1',
-          user: 'Riley',
-          picks: [
-            { game: 'KC @ BUF', bet: 'Patrick Mahomes Over 2.5 Passing TDs', status: 'live' },
-            { game: 'KC @ BUF', bet: 'Josh Allen Over 250.5 Passing Yards', status: 'live' }
-          ],
-          odds: '+280',
-          status: 'live'
-        }
-      ]);
+      // Keep the hardcoded parlays and don't override them
     }
   }, [simulation.isRunning, simulation.currentGame, simulation.currentPlay, simulation.playIndex, simulation.playerAStats, simulation.playerBStats]);
 
@@ -317,17 +496,17 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   // Dropdown data
   const gameOptions = [
     { value: 'all', label: 'All Games' },
-    { value: 'KC @ BUF', label: 'KC @ BUF' },
-    { value: 'SF @ DAL', label: 'SF @ DAL' },
-    { value: 'MIA @ NE', label: 'MIA @ NE' }
+    ...Array.from(new Set(allParlays.flatMap(parlay => parlay.picks.map(pick => pick.game))))
+      .map(game => ({ value: game, label: game }))
   ];
 
   const userOptions = [
     { value: 'all', label: 'All Users' },
     { value: 'Riley', label: 'Riley' },
-    { value: 'Kai', label: 'Kai' },
+    { value: 'Alex', label: 'Alex' },
+    { value: 'Jordan', label: 'Jordan' },
     { value: 'Sam', label: 'Sam' },
-    { value: 'Alex', label: 'Alex' }
+    { value: 'Taylor', label: 'Taylor' }
   ];
 
   const renderClutchTimeSection = () => (
@@ -422,159 +601,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         </View>
   );
 
-  const renderPickOfDay = () => (
-    <Card style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
-      <View style={{ padding: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>⭐ Pick of the Day</Text>
-          <Badge color={colors.error}>
-            <Text style={{ fontSize: 10, color: '#fff' }}>⭐ Streak 2</Text>
-          </Badge>
-        </View>
-        
-        {/* Points Info */}
-        <View style={{ backgroundColor: colors.chip, padding: 8, borderRadius: 8, marginBottom: 12 }}>
-          <Text style={{ color: colors.textMid, fontSize: 11, textAlign: 'center' }}>
-            🏆 40 points + streak bonus
-          </Text>
-        </View>
-        
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.textMid, fontSize: 14 }}>NFL • PHI @ DAL</Text>
-          <Badge color={colors.chip}>Passing Yds</Badge>
-        </View>
-        
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <View>
-            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Jalen Hurts</Text>
-            <Text style={{ color: colors.textLow, fontSize: 12 }}>Line 219.5</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button 
-              disabled={!!joshAllenChoice}
-              onPress={() => setJoshAllenChoice('over')}
-              style={{ backgroundColor: colors.mint }}
-            >
-              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Over</Text>
-            </Button>
-            <Button 
-              disabled={!!joshAllenChoice}
-              onPress={() => setJoshAllenChoice('under')}
-              variant="secondary"
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600' }}>Under</Text>
-            </Button>
-          </View>
-        </View>
-        
-        {joshAllenChoice && (
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ color: colors.textHigh, fontSize: 14, fontWeight: '600', marginBottom: 8 }}>
-              You selected Jalen Hurts {joshAllenChoice} 219.5 yards
-            </Text>
-            
-            {/* Game Tracker */}
-            <View style={{ marginBottom: 8 }}>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>Game Info</Text>
-              <View style={{ 
-                backgroundColor: colors.chip,
-                borderRadius: 8,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: colors.steel
-              }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700' }}>
-                    0
-                  </Text>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Line</Text>
-                    <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '600' }}>
-                      219.5
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'center' }}>
-                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Status</Text>
-                    <Text style={{ 
-                      color: colors.textMid, 
-                      fontSize: 14, 
-                      fontWeight: '600' 
-                    }}>
-                      PRE-GAME
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-    </Card>
-  );
 
-  const renderParlayOfDay = () => (
-    <Card style={{ marginBottom: spacing(2), borderColor: colors.steel, borderWidth: 1 }}>
-      <View style={{ padding: 16 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700' }}>Parlay of the Day</Text>
-          <Button variant="secondary" onPress={() => Alert.alert('Add Parlay', 'Add your own parlay of the day')}>
-            <Text style={{ fontSize: 12 }}>+ Add</Text>
-          </Button>
-        </View>
-        
-        <Pressable 
-          onPress={() => {
-            // Navigate to parlay details
-            navigation.navigate('ParlayDetail', {
-              parlay: parlayOfDay
-            });
-          }}
-        >
-          <View style={{ 
-            backgroundColor: colors.slate, 
-            borderRadius: 12, 
-            padding: 12, 
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: colors.steel
-          }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '600' }}>By {parlayOfDay.user}</Text>
-              <Badge color={colors.primary}>{parlayOfDay.odds}</Badge>
-            </View>
-            
-            {parlayOfDay.picks.map((pick, index) => (
-              <View key={index} style={{ 
-                flexDirection: 'row', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                paddingVertical: 4
-              }}>
-                <Text style={{ color: colors.textMid, fontSize: 12 }}>{pick.game}</Text>
-                <Text style={{ color: colors.textHigh, fontSize: 12 }}>{pick.bet}</Text>
-              </View>
-            ))}
-          </View>
-        </Pressable>
-        
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button 
-            style={{ flex: 1, backgroundColor: colors.mint }}
-            onPress={() => Alert.alert('Tail', 'Tailing this parlay!')}
-          >
-            <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Tail</Text>
-          </Button>
-          <Button 
-            variant="secondary"
-            style={{ flex: 1 }}
-            onPress={() => Alert.alert('Fade', 'Fading this parlay!')}
-          >
-            <Text style={{ fontSize: 14, fontWeight: '600' }}>Fade</Text>
-          </Button>
-        </View>
-      </View>
-    </Card>
-  );
 
   const renderLiveLegs = () => (
     <View style={{ marginBottom: spacing(2) }}>
@@ -796,20 +823,13 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           return gameMatch && userMatch;
         })
         .map((parlay) => (
-        <Pressable 
-          key={parlay.id}
-          onPress={() => {
-            navigation.navigate('ParlayDetail', {
-              parlay: parlay
-            });
-          }}
-        >
-          <Card style={{ 
-            marginBottom: 12, 
-            backgroundColor: colors.slate,
-            borderColor: colors.steel,
-            borderWidth: 1
-          }}>
+        <Card key={parlay.id} style={{ 
+          marginBottom: 12, 
+          backgroundColor: colors.slate,
+          borderColor: colors.steel,
+          borderWidth: 1
+        }}>
+          <Pressable onPress={() => setSelectedParlayId(selectedParlayId === parlay.id ? null : parlay.id)}>
             <View style={{ padding: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '600' }}>By {parlay.user}</Text>
@@ -827,9 +847,77 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
                   <Text style={{ color: colors.textHigh, fontSize: 12 }}>{pick.bet}</Text>
                 </View>
               ))}
+              
+              {selectedParlayId === parlay.id && (
+                <View style={{ 
+                  flexDirection: 'row', 
+                  gap: 8, 
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.steel
+                }}>
+                  <Button 
+                    style={{ 
+                      flex: 1, 
+                      backgroundColor: dailyParlaySelection?.parlayId === parlay.id && dailyParlaySelection?.action === 'tail' 
+                        ? colors.mint 
+                        : dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                          ? colors.chip 
+                          : colors.mint,
+                      opacity: dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                        ? 0.5 
+                        : 1,
+                      paddingVertical: 8
+                    }}
+                    disabled={dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id}
+                    onPress={() => {
+                      handleTailFade(parlay.id, 'tail');
+                    }}
+                  >
+                    <Text style={{ 
+                      color: dailyParlaySelection?.parlayId === parlay.id && dailyParlaySelection?.action === 'tail' 
+                        ? '#000' 
+                        : dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                          ? colors.textMid 
+                          : '#000', 
+                      fontSize: 12, 
+                      fontWeight: '600' 
+                    }}>Tail</Text>
+                  </Button>
+                  <Button 
+                    style={{ 
+                      flex: 1, 
+                      backgroundColor: dailyParlaySelection?.parlayId === parlay.id && dailyParlaySelection?.action === 'fade' 
+                        ? colors.error 
+                        : dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                          ? colors.chip 
+                          : colors.chip,
+                      opacity: dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                        ? 0.5 
+                        : 1,
+                      paddingVertical: 8
+                    }}
+                    disabled={dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id}
+                    onPress={() => {
+                      handleTailFade(parlay.id, 'fade');
+                    }}
+                  >
+                    <Text style={{ 
+                      color: dailyParlaySelection?.parlayId === parlay.id && dailyParlaySelection?.action === 'fade' 
+                        ? '#000' 
+                        : dailyParlaySelection?.parlayId && dailyParlaySelection?.parlayId !== parlay.id 
+                          ? colors.textMid 
+                          : colors.textHigh, 
+                      fontSize: 12, 
+                      fontWeight: '600' 
+                    }}>Fade</Text>
+                  </Button>
+                </View>
+              )}
             </View>
-          </Card>
-        </Pressable>
+          </Pressable>
+        </Card>
       ))}
     </View>
   );
@@ -1021,18 +1109,25 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           </View>
         )
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing(2) }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ 
+            padding: spacing(2),
+            paddingBottom: spacing(8)
+          }}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+        >
           {activeTab === 'live' ? (
             <>
               {renderClutchTimeSection()}
-              {renderPickOfDay()}
-              {renderParlayOfDay()}
               {renderLiveLegs()}
             </>
           ) : (
             <>
-              {renderAllParlays()}
               <ActionChannel />
+              <View style={{ height: spacing(2) }} />
+              {renderAllParlays()}
             </>
           )}
         </ScrollView>
