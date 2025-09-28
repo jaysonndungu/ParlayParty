@@ -7,6 +7,9 @@ import { LeadersScreen } from '@/screens/LeadersScreen';
 import { MyPollsScreen } from '@/screens/MyPollsScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { AuthScreen } from '@/screens/AuthScreen';
+import { GameDetailScreen } from '@/screens/GameDetailScreen';
+import { ClutchVoteScreen } from '@/screens/ClutchVoteScreen';
+import { ParlayDetailScreen } from '@/screens/ParlayDetailScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '@/store/AppStore';
 
@@ -49,7 +52,12 @@ export const RootNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isAuthenticated ? (
-        <Stack.Screen name="Main" component={MainTabs} />
+        <>
+          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="GameDetail" component={GameDetailScreen} />
+          <Stack.Screen name="ClutchVote" component={ClutchVoteScreen} />
+          <Stack.Screen name="ParlayDetail" component={ParlayDetailScreen} />
+        </>
       ) : (
         <Stack.Screen name="Auth" component={AuthScreen} />
       )}
