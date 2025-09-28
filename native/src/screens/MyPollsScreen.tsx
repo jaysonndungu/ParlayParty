@@ -42,7 +42,7 @@ export const MyPollsScreen: React.FC = () => {
                   </Badge>
                   <Badge color={
                     item.status === 'pending' ? colors.warning : 
-                    item.status === 'cashed' ? colors.mint : 
+                    item.status === 'CASH' ? colors.mint : 
                     colors.error
                   }>
                     <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>{item.status}</Text>

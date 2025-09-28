@@ -24,7 +24,22 @@ export type Party = {
 };
 export type ActionEvent = { id: string; game: string; user: string; priority: number; isClutch: boolean; text: string };
 export type Poll = { id: string; question: string; options: { id: string; label: string }[]; endsAt: number };
-export type MyPollVote = { id: string; pickLabel: string; partyName: string; choice: 'hit' | 'chalk'; status: 'pending' | 'cashed' | 'chalked'; decidedAt?: number };
+export type MyPollVote = {
+  id: string;
+  pickLabel: string;
+  partyName: string;
+  // user's prediction during Prophet Poll
+  choice: 'hit' | 'miss';
+  // final status after game ends
+  status: 'pending' | 'CASH' | 'CHALK';
+  decidedAt?: number;
+  // metadata to resolve at game end
+  playerSide?: 'A' | 'B';
+  playerName?: string;
+  overUnder?: 'Over' | 'Under';
+  line?: number;
+  type?: string;
+};
 export type PartyPick = {
   id: string;
   game: string;
@@ -144,11 +159,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [clutchStream, setClutchStream] = useState<ActionEvent[]>([]);
   const [poll, setPoll] = useState<Poll | null>(null);
   const [resolvedOptionId, setResolvedOptionId] = useState<string | null>(null);
-  const [myPolls, setMyPolls] = useState<MyPollVote[]>([
-    { id: "seed1", pickLabel: "3-leg parlay • SF @ DAL TT o23.5", partyName: "Sunday Sweats", choice: "hit", status: "cashed", decidedAt: Date.now() - 3600_000 },
-    { id: "seed2", pickLabel: "2-leg parlay • KC @ BUF o/u 44.5", partyName: "Sunday Sweats", choice: "hit", status: "chalked", decidedAt: Date.now() - 7200_000 },
-    { id: "seed3", pickLabel: "4-leg parlay • PHI @ NYG alt spread +3.5", partyName: "Competitive Party", choice: "chalk", status: "pending" },
-  ]);
+  // Start with no polls per spec
+  const [myPolls, setMyPolls] = useState<MyPollVote[]>([]);
+  // Track which clutch props have been triggered to avoid duplicates
+  const [clutchTriggered, setClutchTriggered] = useState<{ A: boolean; B: boolean }>({ A: false, B: false });
+  // One-time guards to avoid duplicate clutch triggers per prop per simulation run
+  const clutchFiredRef = React.useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const [pickOfDay, setPickOfDay] = useState<PickOfDay>(null);
   const [podChoice, setPodChoice] = useState<"over" | "under" | null>(null);
   const [podStreak, setPodStreak] = useState<number>(0);
@@ -510,34 +526,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setResolvedOptionId(null);
   }, []);
 
-  const submitVote = useCallback((opts: { id: string; label: string; partyName: string; choice: 'hit' | 'chalk'; isClutch?: boolean }) => {
-    const { id, label, partyName, choice, isClutch } = opts;
+  const submitVote = useCallback((opts: { id: string; label: string; partyName: string; choice: 'hit' | 'miss'; isClutch?: boolean; meta?: { playerSide: 'A'|'B'; playerName: string; overUnder: 'Over'|'Under'; line: number; type: string } }) => {
+    const { id, label, partyName, choice, isClutch, meta } = opts;
     const uniqueId = `${id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setMyPolls((arr)=>[{ id: uniqueId, pickLabel: label, partyName, choice, status: "pending" }, ...arr]);
-    
-    setTimeout(() => {
-      const correct = Math.random() > 0.5 ? "hit" : "chalk";
-      const gained = (choice === correct) ? (isClutch ? 15 : 10) : (isClutch ? -8 : -5);
-      if (currentParty) {
-        setPartyScores((m) => ({ 
-          ...m, 
-          [currentParty.id]: { 
-            ...(m[currentParty.id] || {}), 
-            [me]: ((m[currentParty.id]?.[me] || 0) + gained) 
-          } 
-        }));
-      }
-      setMyPolls((arr) => arr.map(mp => mp.id === uniqueId ? { ...mp, status: correct === "hit" ? "cashed" : "chalked", decidedAt: Date.now() } : mp));
-    }, 2500);
+    setMyPolls((arr)=>[
+      { id: uniqueId, pickLabel: label, partyName, choice, status: 'pending', playerSide: meta?.playerSide, playerName: meta?.playerName, overUnder: meta?.overUnder, line: meta?.line, type: meta?.type },
+      ...arr
+    ]);
+    // Do not resolve immediately; resolve at game end per spec
   }, [me, currentParty]);
 
   const votePoll = useCallback((optionId: string) => {
     if (!poll) return;
-    const choice: 'hit' | 'chalk' = optionId === 'yes_hit' ? 'hit' : 'chalk';
+    const choice: 'hit' | 'miss' = optionId === 'yes_hit' ? 'hit' : 'miss';
     const partyName = currentParty ? currentParty.name : "All Parties";
-    const label = `Prophet Poll • ${clutch?.game ?? "Live"}`;
-    submitVote({ id: poll.id, label, partyName, choice, isClutch: true });
-  }, [poll, currentParty, clutch, submitVote]);
+    // Build label from poll.question
+    const label = poll.question;
+    // Attach meta from last clutch trigger stored in poll.id mapping via closure on clutch
+    let meta: { playerSide: 'A'|'B'; playerName: string; overUnder: 'Over'|'Under'; line: number; type: string } | undefined;
+    if (simulation.currentGame) {
+      const a = simulation.currentGame.playerA;
+      const b = simulation.currentGame.playerB;
+      if (poll.id.endsWith('_A')) meta = { playerSide: 'A', playerName: a.player, overUnder: a.overUnder, line: a.line, type: a.type };
+      if (poll.id.endsWith('_B')) meta = { playerSide: 'B', playerName: b.player, overUnder: b.overUnder, line: b.line, type: b.type };
+    }
+    submitVote({ id: poll.id, label, partyName, choice, isClutch: true, meta });
+  }, [poll, currentParty, simulation.currentGame, submitVote]);
 
   const handlePodPick = useCallback((choice: "over" | "under") => {
     if (!pickOfDay || !currentParty) return;
@@ -780,11 +794,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setClutch(null);
     setPoll(null);
     setResolvedOptionId(null);
+    setClutchTriggered({ A: false, B: false });
   }, []);
 
   const executeSimulationLoop = useCallback((simulationGame: SimulationGame) => {
     let playIndex = 0;
     const plays = simulationGame.gameScript;
+    // reset guards
+    clutchFiredRef.current = { A: false, B: false };
     
     // Initialize player stats
     const initialStats: PlayerStats = {
@@ -843,20 +860,107 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (currentPlay.involved_players && 
           (currentPlay.involved_players.includes(simulationGame.playerA.player) || 
            currentPlay.involved_players.includes(simulationGame.playerB.player))) {
-        // Add to action channel
+        // Determine if this should be marked as clutch in the action channel
+        const isQ4ForAction = currentPlay.quarter === 4;
+        let isClutchForAction = false;
+        if (isQ4ForAction) {
+          // During Q4 testing, mark as clutch if involves either prop player
+          isClutchForAction = true;
+        }
         const actionEvent: ActionEvent = {
           id: `sim_${playIndex}`,
           game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
           user: 'AI Simulation',
-          priority: 8,
-          isClutch: false,
+          priority: isClutchForAction ? 9 : 8,
+          isClutch: isClutchForAction,
           text: currentPlay.description
         };
+        console.log('[ClutchDebug] Action event', { playIndex, quarter: currentPlay.quarter, isClutchForAction, desc: currentPlay.description });
         setEvents(prev => [actionEvent, ...prev.slice(0, 29)]);
+      }
+
+      // Clutch Time detection (Q4 - TESTING: ALL props trigger in Q4)
+      const isQ4 = currentPlay.quarter === 4;
+      if (isQ4) {
+        const aLine = simulationGame.playerA.line;
+        const bLine = simulationGame.playerB.line;
+        const aType = simulationGame.playerA.type as keyof PlayerStats;
+        const bType = simulationGame.playerB.type as keyof PlayerStats;
+        const aVal = playerAStats[aType] as unknown as number;
+        const bVal = playerBStats[bType] as unknown as number;
+        // TESTING: Remove threshold check - trigger for ALL props in Q4
+        const aThreshold = 0; // Changed from 0.8 * aLine
+        const bThreshold = 0; // Changed from 0.8 * bLine
+
+        // Trigger A (now triggers for ANY stat value in Q4)
+        console.log('[ClutchDebug] Q4 detected', { playIndex, aVal, aThreshold, bVal, bThreshold, aType, bType, aLine, bLine });
+        if (!clutchFiredRef.current.A && aVal >= aThreshold) {
+          clutchFiredRef.current.A = true;
+          setClutchTriggered((s) => ({ ...s, A: true }));
+          // Set clutch banner and create Prophet Poll for A
+          const clutchIdA = `${simulationGame.id}-${simulationGame.playerA.player}-${simulationGame.playerA.prop}`;
+          const clutchEventA: ActionEvent = {
+            id: clutchIdA,
+            game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
+            user: simulationGame.playerA.player,
+            priority: 10,
+            isClutch: true,
+            text: `${simulationGame.playerA.player} • ${simulationGame.playerA.overUnder} ${simulationGame.playerA.line} ${simulationGame.playerA.prop}`
+          };
+          console.log('[ClutchDebug] Trigger A', clutchEventA);
+          setClutch(clutchEventA);
+          setClutchStream(prev => {
+            if (prev.some(e => e.id === clutchIdA)) return prev;
+            return [clutchEventA, ...prev].slice(0, 20);
+          });
+          const endsAt = Date.now() + 15000;
+          setPoll({
+            id: `poll_${clutchIdA}`,
+            question: `Will ${simulationGame.playerA.player} ${simulationGame.playerA.overUnder === 'Over' ? 'hit' : 'stay under'} ${simulationGame.playerA.line} ${simulationGame.playerA.prop.toLowerCase()}?`,
+            options: [
+              { id: 'yes_hit', label: 'Yes, it hits' },
+              { id: 'no_miss', label: 'No, it misses' },
+            ],
+            endsAt
+          });
+          setResolvedOptionId(null);
+        }
+
+        // Trigger B (now triggers for ANY stat value in Q4)
+        if (!clutchFiredRef.current.B && bVal >= bThreshold) {
+          clutchFiredRef.current.B = true;
+          setClutchTriggered((s) => ({ ...s, B: true }));
+          const clutchIdB = `${simulationGame.id}-${simulationGame.playerB.player}-${simulationGame.playerB.prop}`;
+          const clutchEventB: ActionEvent = {
+            id: clutchIdB,
+            game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
+            user: simulationGame.playerB.player,
+            priority: 10,
+            isClutch: true,
+            text: `${simulationGame.playerB.player} • ${simulationGame.playerB.overUnder} ${simulationGame.playerB.line} ${simulationGame.playerB.prop}`
+          };
+          console.log('[ClutchDebug] Trigger B', clutchEventB);
+          setClutch(clutchEventB);
+          setClutchStream(prev => {
+            if (prev.some(e => e.id === clutchIdB)) return prev;
+            return [clutchEventB, ...prev].slice(0, 20);
+          });
+          const endsAt = Date.now() + 15000;
+          setPoll({
+            id: `poll_${clutchIdB}`,
+            question: `Will ${simulationGame.playerB.player} ${simulationGame.playerB.overUnder === 'Over' ? 'hit' : 'stay under'} ${simulationGame.playerB.line} ${simulationGame.playerB.prop.toLowerCase()}?`,
+            options: [
+              { id: 'yes_hit', label: 'Yes, it hits' },
+              { id: 'no_miss', label: 'No, it misses' },
+            ],
+            endsAt
+          });
+          setResolvedOptionId(null);
+        }
       }
       
       playIndex++;
-    }, 1500); // 1.5 second delay between plays
+    }, 800); // Faster tick: 0.8s per play
   }, [handleSimulationEnd]);
 
   const handleSimulationEnd = useCallback((simulationGame: SimulationGame) => {
@@ -886,6 +990,63 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Determine prop outcomes using actual stats
       const playerAOutcome = GameSimulationService.determinePropOutcome(simulationGame.playerA, prev.playerAStats);
       const playerBOutcome = GameSimulationService.determinePropOutcome(simulationGame.playerB, prev.playerBStats);
+
+      // Resolve My Polls per rules and apply points
+      setMyPolls((arr) => {
+        console.log('[PollResolution] Starting resolution with', arr.length, 'polls');
+        const updatedPolls = arr.map(mp => {
+          if (!mp.playerSide) {
+            console.log('[PollResolution] Skipping poll without playerSide:', mp.id);
+            return mp;
+          }
+          const outcome = mp.playerSide === 'A' ? playerAOutcome : playerBOutcome; // 'hit' | 'miss'
+          console.log('[PollResolution] Resolving poll:', { 
+            id: mp.id, 
+            playerSide: mp.playerSide, 
+            userChoice: mp.choice, 
+            actualOutcome: outcome,
+            playerAOutcome,
+            playerBOutcome
+          });
+          
+          // Status mapping: user's prediction matches actual outcome → CASH, else CHALK
+          const status = (mp.choice === 'hit' && outcome === 'hit') || (mp.choice === 'miss' && outcome === 'miss') ? 'CASH' : 'CHALK';
+          console.log('[PollResolution] Final status:', status);
+          
+          return { ...mp, status, decidedAt: Date.now() };
+        });
+        
+        // Apply points: correct => -10, incorrect => +10
+        console.log('[PollResolution] Checking currentParty:', { currentParty: currentParty?.id, user: user?.id, me });
+        if (currentParty && user) {
+          const delta = (mp: MyPollVote) => {
+            const outcome = mp.playerSide === 'A' ? playerAOutcome : playerBOutcome;
+            const correct = (mp.choice === 'hit' && outcome === 'hit') || (mp.choice === 'miss' && outcome === 'miss');
+            const points = correct ? -10 : 10;
+            console.log('[PollResolution] Points for poll', mp.id, ':', points, '(correct:', correct, ')');
+            return points;
+          };
+          const totalPointsChange = updatedPolls.reduce((acc, p) => acc + delta(p), 0);
+          console.log('[PollResolution] Applying points:', { totalPointsChange, polls: updatedPolls.length, currentParty: currentParty.id, me });
+          setPartyScores((m) => ({
+            ...m,
+            [currentParty.id]: {
+              ...(m[currentParty.id] || {}),
+              [me]: (m[currentParty.id]?.[me] || 0) + totalPointsChange
+            }
+          }));
+          // Persist score to DB
+          supabaseAPI.adjustPartyMemberScore(currentParty.id, user.id, totalPointsChange).then((res)=>{
+            console.log('[PollResolution] DB score update result:', res);
+          }).catch((e)=>{
+            console.warn('[PollResolution] DB score update failed:', e);
+          });
+        } else {
+          console.log('[PollResolution] Skipping points - no currentParty or user:', { currentParty: !!currentParty, user: !!user });
+        }
+        
+        return updatedPolls;
+      });
       
       // Show final results
       const finalEvent: ActionEvent = {
@@ -898,6 +1059,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       
       setEvents(prevEvents => [finalEvent, ...prevEvents.slice(0, 29)]);
+      
+      // Clear clutch state at game end
+      setClutch(null);
+      setClutchStream([]);
+      setClutchTriggered({ A: false, B: false });
       
       return {
         ...prev,

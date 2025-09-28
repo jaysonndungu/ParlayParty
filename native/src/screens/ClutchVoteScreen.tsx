@@ -3,6 +3,7 @@ import { View, Text, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Badge } from '@/components/ui';
+import { useStore } from '@/store/AppStore';
 
 interface ClutchVoteScreenProps {
   route: {
@@ -23,6 +24,7 @@ export const ClutchVoteScreen: React.FC<ClutchVoteScreenProps> = ({ route, navig
   const [timeLeft, setTimeLeft] = useState(6); // 6 seconds timer
   const [hasVoted, setHasVoted] = useState(false);
   const [vote, setVote] = useState<'yes' | 'no' | null>(null);
+  const { submitVote, simulation } = useStore();
 
   const avatarUrl = (name: string) => {
     const seed = encodeURIComponent(name);
@@ -40,7 +42,19 @@ export const ClutchVoteScreen: React.FC<ClutchVoteScreenProps> = ({ route, navig
     if (!hasVoted && timeLeft > 0) {
       setVote(voteType);
       setHasVoted(true);
-      // Here you would typically send the vote to your backend
+      // Add to My Polls as pending and resolve at game end
+      const choice = voteType === 'yes' ? 'hit' : 'miss';
+      const partyName = game;
+      // Determine player side and meta from current simulation
+      let meta: { playerSide: 'A'|'B'; playerName: string; overUnder: 'Over'|'Under'; line: number; type: string } | undefined;
+      if (simulation.currentGame) {
+        const a = simulation.currentGame.playerA;
+        const b = simulation.currentGame.playerB;
+        if (a.player === user) meta = { playerSide: 'A', playerName: a.player, overUnder: a.overUnder, line: a.line, type: a.type };
+        if (b.player === user) meta = { playerSide: 'B', playerName: b.player, overUnder: b.overUnder, line: b.line, type: b.type };
+      }
+      const question = `Will ${user}'s prop (${bet}) hit?`;
+      submitVote({ id: `clutchvote_${Date.now()}`, label: question, partyName, choice, isClutch: true, meta });
     }
   };
 

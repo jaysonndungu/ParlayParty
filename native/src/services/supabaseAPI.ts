@@ -106,6 +106,34 @@ export const supabaseAPI = {
     }
   },
 
+  // Scores
+  async adjustPartyMemberScore(partyId: string, userId: string, delta: number) {
+    try {
+      // Fetch current score
+      const { data: member, error: fetchError } = await supabase
+        .from('party_members')
+        .select('id,total_score')
+        .eq('party_id', partyId)
+        .eq('user_id', userId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const current = (member?.total_score as number) || 0;
+      const next = current + delta;
+
+      const { error: updateError } = await supabase
+        .from('party_members')
+        .update({ total_score: next })
+        .eq('id', member.id);
+      if (updateError) throw updateError;
+
+      return { success: true, total_score: next };
+    } catch (e) {
+      console.error('adjustPartyMemberScore error:', e);
+      return { success: false };
+    }
+  },
+
   async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

@@ -35,6 +35,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'live' | 'parlays' | 'chat'>('live');
+  const [showPoll, setShowPoll] = useState(false);
   const [selectedGame, setSelectedGame] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [showGameDropdown, setShowGameDropdown] = useState(false);
@@ -277,28 +278,14 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   const currentPrizePool = currentParty ? partyPrizePools[currentParty.id] || 0 : 0;
 
   // Mock data for the new UI
-  const clutchTimeEvents = [
-    {
-      id: '1',
-      game: 'KC @ BUF',
-      user: 'Riley',
-      text: 'over/under 50.5 yards',
-      progress: 97,
-      current: 49,
-      total: 50.5,
-      isClutch: true
-    },
-    {
-      id: '2', 
-      game: 'SF @ DAL',
-      user: 'Kai',
-      text: 'team total over 23.5 points',
-      progress: 95,
-      current: 22.3,
-      total: 23.5,
-      isClutch: false
-    }
-  ];
+  // Build clutch cards from the live clutch stream
+  const clutchTimeEvents = (useStore().clutchStream || []).map((ev) => ({
+    id: ev.id,
+    game: ev.game,
+    user: ev.user,
+    text: ev.text,
+    isClutch: ev.isClutch,
+  }));
 
   const parlayOfDay = {
     id: '1',
@@ -348,9 +335,9 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
                   game: event.game,
                   user: event.user,
                   bet: event.text,
-                  progress: event.progress,
-                  current: event.current,
-                  total: event.total
+                  progress: 0,
+                  current: 0,
+                  total: 0
                 });
               }}
             >
@@ -363,39 +350,17 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
               }}>
         <View style={{ padding: 16 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={{ color: colors.textLow, fontSize: 12 }}>{event.game} • {event.user}</Text>
+                    <Text style={{ color: event.isClutch ? '#000' : colors.textLow, fontSize: 12 }}>{event.game} • {event.user}</Text>
           </View>
           
-                  <Text style={{ 
-                    color: event.isClutch ? '#000' : colors.textHigh, 
-                    fontSize: 16, 
-                    fontWeight: '700',
-                    marginBottom: 12
-                  }}>
+                  <Text style={{ color: event.isClutch ? '#000' : colors.textHigh, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>
                     {event.text}
                   </Text>
+                  <Text style={{ color: event.isClutch ? '#000' : colors.textLow, fontSize: 12 }}>
+                    By {event.user}
+                  </Text>
                   
-                  <View style={{ marginBottom: 8 }}>
-                    <Text style={{ color: event.isClutch ? '#000' : colors.textLow, fontSize: 12, marginBottom: 4 }}>
-                      Leg progress
-                    </Text>
-                    <View style={{ 
-                      height: 6, 
-                      backgroundColor: event.isClutch ? 'rgba(0,0,0,0.2)' : colors.steel, 
-                      borderRadius: 3,
-                      overflow: 'hidden'
-                    }}>
-                      <View style={{ 
-                        height: '100%', 
-                        width: `${event.progress}%`, 
-                        backgroundColor: colors.mint,
-                        borderRadius: 3
-                      }} />
-                    </View>
-                    <Text style={{ color: event.isClutch ? '#000' : colors.textLow, fontSize: 12, marginTop: 4 }}>
-                      {event.current}/{event.total} • {event.progress}%
-                    </Text>
-                  </View>
+                  {/* Progress UI removed; spec requires simple clutch card */}
                 </View>
               </Card>
             </Pressable>
@@ -409,10 +374,7 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
           }}>
             <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
               <Text style={{ color: colors.textMid, fontSize: 16, textAlign: 'center' }}>
-                No clutch moments right now
-              </Text>
-              <Text style={{ color: colors.textLow, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
-                Stay tuned for exciting plays!
+                No active clutch moments.
               </Text>
             </View>
           </Card>

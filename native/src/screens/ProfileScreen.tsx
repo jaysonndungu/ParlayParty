@@ -17,7 +17,8 @@ export const ProfileScreen: React.FC = () => {
     addWalletFunds,
     authLoading,
     updateProfile,
-    setProfilePhotoUrl
+    setProfilePhotoUrl,
+    partyScores
   } = useStore();
   
   const [showAddFunds, setShowAddFunds] = useState(false);
@@ -150,9 +151,14 @@ export const ProfileScreen: React.FC = () => {
   
   const totalPolls = myPolls.length;
   const hitPolls = myPolls.filter(p => p.choice === 'hit').length;
-  const cashedPolls = myPolls.filter(p => p.status === 'cashed').length;
+  const cashedPolls = myPolls.filter(p => p.status === 'CASH').length;
   const hitRate = totalPolls > 0 ? Math.round((hitPolls / totalPolls) * 100) : 0;
   const cashRate = totalPolls > 0 ? Math.round((cashedPolls / totalPolls) * 100) : 0;
+  
+  // Calculate total points across all parties
+  const totalPoints = Object.values(partyScores).reduce((total, partyScore) => {
+    return total + (partyScore[user?.id || ''] || 0);
+  }, 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.ink }}>
@@ -186,18 +192,20 @@ export const ProfileScreen: React.FC = () => {
             {user.fullName}
           </Text>
           
-          <Text style={{ color: colors.textMid, fontSize: 16, marginBottom: 8 }}>
+          <Text style={{ color: colors.textMid, fontSize: 16, marginBottom: 16 }}>
             @{user.username}
           </Text>
-          
-          <Text style={{ color: colors.textLow, fontSize: 14, marginBottom: 16 }}>
-            {user.email}
-          </Text>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ gap: 8 }}>
             <Badge color={colors.gold}>
               <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
                 Wallet: ${user.walletBalance.toFixed(2)}
+              </Text>
+            </Badge>
+            
+            <Badge color={colors.mint}>
+              <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>
+                Points: {totalPoints}
               </Text>
             </Badge>
             
@@ -361,7 +369,7 @@ export const ProfileScreen: React.FC = () => {
                 
                 <Badge color={
                   poll.status === 'pending' ? colors.warning : 
-                  poll.status === 'cashed' ? colors.mint : 
+                  poll.status === 'CASH' ? colors.mint : 
                   colors.error
                 }>
                   <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>

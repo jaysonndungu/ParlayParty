@@ -1,11 +1,13 @@
 import React from 'react';
 import { Text, View, Image, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@/store/AppStore';
 import { colors } from '@/theme/tokens';
 import { Card, Badge, Button } from '@/components/ui';
 
 export const ActionChannel: React.FC = () => {
   const { events, clutch } = useStore();
+  const navigation = useNavigation<any>();
   const topEvents = [...events].sort((a, b) => b.priority - a.priority).slice(0, 6);
 
   return (
@@ -41,10 +43,19 @@ export const ActionChannel: React.FC = () => {
             {item.isClutch && (
               <Button 
                 variant="primary" 
-                onPress={() => {/* Handle clutch focus */}}
+                onPress={() => {
+                  navigation.navigate('ClutchVote', {
+                    game: item.game,
+                    user: item.user,
+                    bet: item.text,
+                    progress: 0,
+                    current: 0,
+                    total: 0
+                  });
+                }}
                 style={{ backgroundColor: colors.gold }}
               >
-                <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Clutch Time</Text>
+                <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Clutch</Text>
               </Button>
             )}
           </View>
