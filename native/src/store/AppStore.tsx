@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabaseAPI } from '../services/supabaseAPI';
+import { GameSimulationService, SimulationGame, GamePlay, GameFinal, PlayerStats } from '../services/gameSimulationService';
 
 // Simple in-memory storage for development
 const mockStorage = {
@@ -37,6 +38,17 @@ export type PartyPick = {
 };
 export type PickOfDay = { id: string; league: string; player: string; prop: string; line: number; game: string; resolved?: boolean; correct?: "over" | "under" } | null;
 export type ChatMessage = { id: string; user: string; text: string; ts: number };
+
+// Game Simulation Types
+export type SimulationState = {
+  isRunning: boolean;
+  currentGame: SimulationGame | null;
+  currentPlay: GamePlay | null;
+  playIndex: number;
+  simulationError: string | null;
+  playerAStats: PlayerStats | null;
+  playerBStats: PlayerStats | null;
+};
 
 const USERS = ['Alex','Jordan','Sam','Taylor','Riley','Casey','Devin','Kai'] as const;
 const GAMES = ['SF @ DAL','KC @ BUF','PHI @ NYG','MIA @ NE','LAL @ DEN','BOS @ MIA','GSW @ PHX','NYK @ MIL'];
@@ -89,6 +101,9 @@ interface StoreState {
   connections: Record<string, boolean>;
   now: number;
   
+  // Game Simulation state
+  simulation: SimulationState;
+  
   // Actions
   createParty: (name: string, type: PartyType, startDate: string, endDate: string, buyIn?: number, allowedSports?: string[], evalLimit?: number) => Promise<{ joinCode: string; partyId: string } | null>;
   joinParty: (code: string, buyIn?: number) => Promise<void>;
@@ -105,6 +120,11 @@ interface StoreState {
   setConnections: (connections: Record<string, boolean>) => void;
   addChatMessage: (partyId: string, message: ChatMessage) => void;
   getChatMessages: (partyId: string) => Promise<ChatMessage[]>;
+  
+  // Game Simulation actions
+  startGameSimulation: () => Promise<void>;
+  stopGameSimulation: () => void;
+  clearSimulationData: () => void;
 }
 
 const StoreCtx = createContext<StoreState | null>(null);
@@ -137,6 +157,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [connections, setConnections] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState<number>(Date.now());
+  
+  // Game Simulation state
+  const [simulation, setSimulation] = useState<SimulationState>({
+    isRunning: false,
+    currentGame: null,
+    currentPlay: null,
+    playIndex: 0,
+    simulationError: null,
+    playerAStats: null,
+    playerBStats: null
+  });
   
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -693,6 +724,189 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user]);
 
+  // Game Simulation actions
+  const startGameSimulation = useCallback(async () => {
+    // Prevent multiple simultaneous simulations
+    if (simulation.isRunning) {
+      console.log('Simulation already running, ignoring request');
+      return;
+    }
+    
+    try {
+      setSimulation(prev => ({ ...prev, simulationError: null }));
+      
+      // Clear existing dummy data
+      clearSimulationData();
+      
+      // Use KC @ BUF from dummy data (KC = Chiefs, BUF = Bills)
+      const teamA = { name: "Chiefs", abbreviation: "KC", city: "Kansas City" };
+      const teamB = { name: "Bills", abbreviation: "BUF", city: "Buffalo" };
+      
+      // Generate new game simulation with these specific teams
+      const simulationGame = await GameSimulationService.generateGameSimulationWithTeams(teamA, teamB);
+      
+      setSimulation(prev => ({
+        ...prev,
+        isRunning: true,
+        currentGame: simulationGame,
+        currentPlay: null,
+        playIndex: 0
+      }));
+      
+      // Start the simulation loop
+      executeSimulationLoop(simulationGame);
+      
+    } catch (error) {
+      setSimulation(prev => ({
+        ...prev,
+        simulationError: error instanceof Error ? error.message : 'Failed to start simulation'
+      }));
+    }
+  }, [simulation.isRunning, clearSimulationData, executeSimulationLoop]);
+
+  const stopGameSimulation = useCallback(() => {
+    setSimulation(prev => ({
+      ...prev,
+      isRunning: false,
+      currentPlay: null,
+      playIndex: 0,
+      currentGame: null
+    }));
+  }, []);
+
+  const clearSimulationData = useCallback(() => {
+    // Clear action channel events
+    setEvents([]);
+    setClutch(null);
+    setPoll(null);
+    setResolvedOptionId(null);
+  }, []);
+
+  const executeSimulationLoop = useCallback((simulationGame: SimulationGame) => {
+    let playIndex = 0;
+    const plays = simulationGame.gameScript;
+    
+    // Initialize player stats
+    const initialStats: PlayerStats = {
+      passing_yards: 0,
+      passing_tds: 0,
+      rushing_yards: 0,
+      rushing_tds: 0,
+      receiving_yards: 0,
+      receiving_tds: 0,
+      receptions: 0
+    };
+    
+    let playerAStats = { ...initialStats };
+    let playerBStats = { ...initialStats };
+    
+    const playInterval = setInterval(() => {
+      // Check if simulation was stopped
+      setSimulation(prev => {
+        if (!prev.isRunning) {
+          clearInterval(playInterval);
+          return prev;
+        }
+        return prev;
+      });
+      
+      if (playIndex >= plays.length) {
+        clearInterval(playInterval);
+        handleSimulationEnd(simulationGame);
+        return;
+      }
+      
+      const currentPlay = plays[playIndex] as GamePlay;
+      
+      // Update stats if players are involved
+      if (currentPlay.involved_players) {
+        if (currentPlay.involved_players.includes(simulationGame.playerA.player)) {
+          playerAStats = GameSimulationService.parsePlayStats(currentPlay.description, playerAStats);
+        }
+        if (currentPlay.involved_players.includes(simulationGame.playerB.player)) {
+          playerBStats = GameSimulationService.parsePlayStats(currentPlay.description, playerBStats);
+        }
+      }
+      
+      // Update simulation state
+      setSimulation(prev => ({
+        ...prev,
+        currentPlay,
+        playIndex,
+        playerAStats,
+        playerBStats
+      }));
+      
+      // UI updates are handled in BoardScreen component via useEffect
+      
+      // Check if this play involves our key players
+      if (currentPlay.involved_players && 
+          (currentPlay.involved_players.includes(simulationGame.playerA.player) || 
+           currentPlay.involved_players.includes(simulationGame.playerB.player))) {
+        // Add to action channel
+        const actionEvent: ActionEvent = {
+          id: `sim_${playIndex}`,
+          game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
+          user: 'AI Simulation',
+          priority: 8,
+          isClutch: false,
+          text: currentPlay.description
+        };
+        setEvents(prev => [actionEvent, ...prev.slice(0, 29)]);
+      }
+      
+      playIndex++;
+    }, 1500); // 1.5 second delay between plays
+  }, [handleSimulationEnd]);
+
+  const handleSimulationEnd = useCallback((simulationGame: SimulationGame) => {
+    const finalPlay = simulationGame.gameScript[simulationGame.gameScript.length - 1] as GameFinal;
+    
+    // Update simulation state and determine outcomes
+    setSimulation(prev => {
+      if (!prev.playerAStats || !prev.playerBStats) {
+        // Fallback if stats are not available
+        const finalEvent: ActionEvent = {
+          id: 'sim_final',
+          game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
+          user: 'AI Simulation',
+          priority: 10,
+          isClutch: true,
+          text: `Game Over! Final Score: ${finalPlay?.final_score?.[simulationGame.teamA.abbreviation] || '0'} - ${finalPlay?.final_score?.[simulationGame.teamB.abbreviation] || '0'}`
+        };
+        setEvents(prevEvents => [finalEvent, ...prevEvents.slice(0, 29)]);
+        
+        return {
+          ...prev,
+          isRunning: false,
+          currentPlay: null
+        };
+      }
+      
+      // Determine prop outcomes using actual stats
+      const playerAOutcome = GameSimulationService.determinePropOutcome(simulationGame.playerA, prev.playerAStats);
+      const playerBOutcome = GameSimulationService.determinePropOutcome(simulationGame.playerB, prev.playerBStats);
+      
+      // Show final results
+      const finalEvent: ActionEvent = {
+        id: 'sim_final',
+        game: `${simulationGame.teamA.abbreviation} @ ${simulationGame.teamB.abbreviation}`,
+        user: 'AI Simulation',
+        priority: 10,
+        isClutch: true,
+        text: `Game Over! Final Score: ${finalPlay?.final_score?.[simulationGame.teamA.abbreviation] || '0'} - ${finalPlay?.final_score?.[simulationGame.teamB.abbreviation] || '0'}. ${simulationGame.playerA.player}: ${playerAOutcome === 'hit' ? 'CASH!' : 'CHALK!'}, ${simulationGame.playerB.player}: ${playerBOutcome === 'hit' ? 'CASH!' : 'CHALK!'}`
+      };
+      
+      setEvents(prevEvents => [finalEvent, ...prevEvents.slice(0, 29)]);
+      
+      return {
+        ...prev,
+        isRunning: false,
+        currentPlay: null
+      };
+    });
+  }, []);
+
   const value: StoreState = useMemo(() => ({
     // Authentication state
     isAuthenticated,
@@ -732,6 +946,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     connections,
     now,
     
+    // Game Simulation state
+    simulation,
+    
     // Existing methods
     createParty,
     joinParty,
@@ -755,6 +972,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     logout,
     updateProfile,
     addWalletFunds,
+    
+    // Game Simulation methods
+    startGameSimulation,
+    stopGameSimulation,
+    clearSimulationData,
   }), [
     // Authentication dependencies
     isAuthenticated, authToken, user, authLoading, authError,
@@ -768,7 +990,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     submitVote, votePoll, handlePodPick, addFunds, withdrawFunds, setProfilePhotoUrl, 
     setConnections, addChatMessage, getChatMessages,
     // Authentication method dependencies
-    register, login, logout, updateProfile, addWalletFunds
+    register, login, logout, updateProfile, addWalletFunds,
+    // Game Simulation dependencies
+    simulation, startGameSimulation, stopGameSimulation, clearSimulationData
   ]);
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;

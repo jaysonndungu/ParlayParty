@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, Pressable, ScrollView, Alert, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
@@ -28,7 +28,10 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
     partyScores,
     me,
     user,
-    logout
+    logout,
+    simulation,
+    startGameSimulation,
+    stopGameSimulation
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'live' | 'parlays' | 'chat'>('live');
@@ -36,6 +39,212 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [showGameDropdown, setShowGameDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  
+  // Make liveLegs and allParlays stateful so simulation can update them
+  // Dummy data should be ONE game with 2 teams and 2 player props
+  const [liveLegs, setLiveLegs] = useState([
+    {
+      id: '1',
+      game: 'KC @ BUF',
+      time: 'Q1 15:00',
+      score: '0-0',
+      bet: 'Patrick Mahomes Over 2.5 Passing TDs',
+      user: 'Riley',
+      legProgress: 0,
+      parlayProgress: 0,
+      current: 0,
+      total: 2.5
+    },
+    {
+      id: '2',
+      game: 'KC @ BUF', 
+      time: 'Q1 15:00',
+      score: '0-0',
+      bet: 'Josh Allen Over 250.5 Passing Yards',
+      user: 'Kai',
+      legProgress: 0,
+      parlayProgress: 0,
+      current: 0,
+      total: 250.5
+    }
+  ]);
+
+  const [allParlays, setAllParlays] = useState([
+    {
+      id: '1',
+      user: 'Riley',
+      picks: [
+        { game: 'KC @ BUF', bet: 'Patrick Mahomes Over 2.5 Passing TDs', status: 'live' },
+        { game: 'KC @ BUF', bet: 'Josh Allen Over 250.5 Passing Yards', status: 'live' }
+      ],
+      odds: '+280',
+      status: 'live'
+    }
+  ]);
+
+  // Listen to simulation changes and update UI accordingly
+  useEffect(() => {
+    if (simulation.isRunning && simulation.currentGame && simulation.currentPlay) {
+      const gameString = `${simulation.currentGame.teamA.abbreviation} @ ${simulation.currentGame.teamB.abbreviation}`;
+      const scoreString = `${simulation.currentPlay.team_A_score}-${simulation.currentPlay.team_B_score}`;
+      const timeString = `Q${simulation.currentPlay.quarter} ${simulation.currentPlay.game_clock}`;
+      
+      // Get current stats for each player
+      const playerACurrent = simulation.playerAStats ? simulation.playerAStats[simulation.currentGame.playerA.type as keyof typeof simulation.playerAStats] || 0 : 0;
+      const playerBCurrent = simulation.playerBStats ? simulation.playerBStats[simulation.currentGame.playerB.type as keyof typeof simulation.playerBStats] || 0 : 0;
+      
+      // Update live legs with simulation data
+      const newLiveLegs = [
+        {
+          id: 'sim_1',
+          game: gameString,
+          time: timeString,
+          score: scoreString,
+          bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0, // Not used anymore
+          parlayProgress: 0, // Not used anymore
+          current: playerACurrent,
+          total: simulation.currentGame.playerA.line
+        },
+        {
+          id: 'sim_2',
+          game: gameString,
+          time: timeString,
+          score: scoreString,
+          bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0, // Not used anymore
+          parlayProgress: 0, // Not used anymore
+          current: playerBCurrent,
+          total: simulation.currentGame.playerB.line
+        }
+      ];
+      
+      setLiveLegs(newLiveLegs);
+      
+      // Update all parlays with simulation data
+      const newAllParlays = [
+        {
+          id: 'sim_parlay',
+          user: 'AI Simulation',
+          picks: [
+            { game: gameString, bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`, status: 'live' },
+            { game: gameString, bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`, status: 'live' }
+          ],
+          odds: '+450',
+          status: 'live'
+        }
+      ];
+      
+      setAllParlays(newAllParlays);
+    } else if (!simulation.isRunning && simulation.currentGame && simulation.playerAStats && simulation.playerBStats) {
+      // Show final results when simulation ends
+      const gameString = `${simulation.currentGame.teamA.abbreviation} @ ${simulation.currentGame.teamB.abbreviation}`;
+      
+      // Get final stats for each player
+      const playerACurrent = simulation.playerAStats[simulation.currentGame.playerA.type as keyof typeof simulation.playerAStats] || 0;
+      const playerBCurrent = simulation.playerBStats[simulation.currentGame.playerB.type as keyof typeof simulation.playerBStats] || 0;
+      
+      // Determine final outcomes based on Over/Under
+      const playerAOutcome = simulation.currentGame.playerA.overUnder === 'Over' ? 
+        (playerACurrent > simulation.currentGame.playerA.line ? 'CASH!' : 'CHALK!') :
+        (playerACurrent < simulation.currentGame.playerA.line ? 'CASH!' : 'CHALK!');
+      
+      const playerBOutcome = simulation.currentGame.playerB.overUnder === 'Over' ? 
+        (playerBCurrent > simulation.currentGame.playerB.line ? 'CASH!' : 'CHALK!') :
+        (playerBCurrent < simulation.currentGame.playerB.line ? 'CASH!' : 'CHALK!');
+      
+      // Update live legs with final results
+      const newLiveLegs = [
+        {
+          id: 'sim_1',
+          game: gameString,
+          time: 'FINAL',
+          score: 'GAME OVER',
+          bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: playerACurrent,
+          total: simulation.currentGame.playerA.line,
+          finalOutcome: playerAOutcome
+        },
+        {
+          id: 'sim_2',
+          game: gameString,
+          time: 'FINAL',
+          score: 'GAME OVER',
+          bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`,
+          user: 'AI Simulation',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: playerBCurrent,
+          total: simulation.currentGame.playerB.line,
+          finalOutcome: playerBOutcome
+        }
+      ];
+      
+      setLiveLegs(newLiveLegs);
+      
+      // Update all parlays with final results
+      const newAllParlays = [
+        {
+          id: 'sim_parlay',
+          user: 'AI Simulation',
+          picks: [
+            { game: gameString, bet: `${simulation.currentGame.playerA.player} ${simulation.currentGame.playerA.overUnder} ${simulation.currentGame.playerA.line} ${simulation.currentGame.playerA.prop}`, status: playerAOutcome === 'CASH!' ? 'win' : 'loss' },
+            { game: gameString, bet: `${simulation.currentGame.playerB.player} ${simulation.currentGame.playerB.overUnder} ${simulation.currentGame.playerB.line} ${simulation.currentGame.playerB.prop}`, status: playerBOutcome === 'CASH!' ? 'win' : 'loss' }
+          ],
+          odds: '+450',
+          status: 'final'
+        }
+      ];
+      
+      setAllParlays(newAllParlays);
+    } else if (!simulation.isRunning && simulation.currentGame === null) {
+      // Reset to original dummy data when simulation stops
+      setLiveLegs([
+        {
+          id: '1',
+          game: 'KC @ BUF',
+          time: 'Q1 15:00',
+          score: '0-0',
+          bet: 'Patrick Mahomes Over 2.5 Passing TDs',
+          user: 'Riley',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: 0,
+          total: 2.5
+        },
+        {
+          id: '2',
+          game: 'KC @ BUF', 
+          time: 'Q1 15:00',
+          score: '0-0',
+          bet: 'Josh Allen Over 250.5 Passing Yards',
+          user: 'Kai',
+          legProgress: 0,
+          parlayProgress: 0,
+          current: 0,
+          total: 250.5
+        }
+      ]);
+      
+      setAllParlays([
+        {
+          id: '1',
+          user: 'Riley',
+          picks: [
+            { game: 'KC @ BUF', bet: 'Patrick Mahomes Over 2.5 Passing TDs', status: 'live' },
+            { game: 'KC @ BUF', bet: 'Josh Allen Over 250.5 Passing Yards', status: 'live' }
+          ],
+          odds: '+280',
+          status: 'live'
+        }
+      ]);
+    }
+  }, [simulation.isRunning, simulation.currentGame, simulation.currentPlay, simulation.playIndex, simulation.playerAStats, simulation.playerBStats]);
 
   const avatarUrl = (name: string) => {
     const seed = encodeURIComponent(name);
@@ -103,67 +312,6 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
     status: 'live'
   };
 
-  const liveLegs = [
-    {
-      id: '1',
-      game: 'KC @ BUF',
-      time: 'Q3 03:59',
-      score: '33-29',
-      bet: 'over/under 50.5 yards',
-      user: 'Riley',
-      legProgress: 97,
-      parlayProgress: 100,
-      current: 49,
-      total: 50.5
-    },
-    {
-      id: '2',
-      game: 'SF @ DAL', 
-      time: 'Q4 01:12',
-      score: '24-29',
-      bet: 'team total over 23.5 points',
-      user: 'Kai',
-      legProgress: 95,
-      parlayProgress: 100,
-      current: 22.3,
-      total: 23.5
-    },
-    {
-      id: '3',
-      game: 'MIA @ NE',
-      time: 'Q4 06:52', 
-      score: '23-22',
-      bet: 'team total over 29.5 points',
-      user: 'Sam',
-      legProgress: 87,
-      parlayProgress: 91,
-      current: 25.7,
-      total: 29.5
-    }
-  ];
-
-  const allParlays = [
-    {
-      id: '1',
-      user: 'Riley',
-      picks: [
-        { game: 'KC @ BUF', bet: 'over/under 50.5 yards', status: 'live' },
-        { game: 'SF @ DAL', bet: 'team total over 23.5 points', status: 'live' }
-      ],
-      odds: '+280',
-      status: 'live'
-    },
-    {
-      id: '2',
-      user: 'Kai', 
-      picks: [
-        { game: 'SF @ DAL', bet: 'team total over 23.5 points', status: 'live' },
-        { game: 'MIA @ NE', bet: 'team total over 29.5 points', status: 'live' }
-      ],
-      odds: '+320',
-      status: 'live'
-    }
-  ];
 
   // Dropdown data
   const gameOptions = [
@@ -401,6 +549,36 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
         Live Legs - Everyone
       </Text>
       
+      {/* Game Simulation Button */}
+      <View style={{ marginBottom: 16 }}>
+        <Button 
+          variant="primary"
+          onPress={simulation.isRunning ? stopGameSimulation : startGameSimulation}
+          disabled={simulation.simulationError !== null}
+          style={{ 
+            backgroundColor: simulation.isRunning ? colors.error : colors.primary,
+            marginBottom: 8
+          }}
+        >
+          <Text style={{ color: '#000', fontSize: 16, fontWeight: '600' }}>
+            {simulation.isRunning ? 'Stop Simulation' : 'Game Simulation'}
+          </Text>
+        </Button>
+        
+        {simulation.simulationError && (
+          <Text style={{ color: colors.error, fontSize: 12, textAlign: 'center' }}>
+            {simulation.simulationError}
+          </Text>
+        )}
+        
+        {simulation.isRunning && simulation.currentGame && (
+          <Text style={{ color: colors.textMid, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+            {simulation.currentGame.teamA.abbreviation} @ {simulation.currentGame.teamB.abbreviation} • 
+            Play {simulation.playIndex + 1} of {simulation.currentGame.gameScript.length}
+          </Text>
+        )}
+      </View>
+      
       {liveLegs.map((leg) => (
         <Pressable 
           key={leg.id}
@@ -442,43 +620,38 @@ export const BoardScreen: React.FC<BoardScreenProps> = ({ navigation }) => {
             </View>
             
             <View style={{ marginBottom: 8 }}>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>Leg progress</Text>
+              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>Current Stats</Text>
               <View style={{ 
-                height: 6, 
-                backgroundColor: colors.steel, 
-                borderRadius: 3,
-                overflow: 'hidden'
+                backgroundColor: colors.chip,
+                borderRadius: 8,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: colors.steel
               }}>
-                <View style={{ 
-                  height: '100%', 
-                  width: `${leg.legProgress}%`, 
-                  backgroundColor: colors.mint,
-                  borderRadius: 3
-                }} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700' }}>
+                    {leg.current}
+                  </Text>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Line</Text>
+                    <Text style={{ color: colors.textHigh, fontSize: 16, fontWeight: '600' }}>
+                      {leg.total}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ color: colors.textMid, fontSize: 12 }}>Status</Text>
+                    <Text style={{ 
+                      color: leg.finalOutcome ? 
+                        (leg.finalOutcome === 'CASH!' ? colors.gold : colors.error) : 
+                        (leg.current >= leg.total ? colors.gold : colors.textMid), 
+                      fontSize: 14, 
+                      fontWeight: '600' 
+                    }}>
+                      {leg.finalOutcome || (leg.current >= leg.total ? 'CASH!' : 'LIVE')}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginTop: 4 }}>
-                {leg.current}/{leg.total} • {leg.legProgress}%
-              </Text>
-            </View>
-            
-            <View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 4 }}>{leg.user}'s parlay</Text>
-              <View style={{ 
-                height: 6, 
-                backgroundColor: colors.steel, 
-                borderRadius: 3,
-                overflow: 'hidden'
-              }}>
-                <View style={{ 
-                  height: '100%', 
-                  width: `${leg.parlayProgress}%`, 
-                  backgroundColor: colors.primary,
-                  borderRadius: 3
-                }} />
-              </View>
-              <Text style={{ color: colors.textLow, fontSize: 12, marginTop: 4 }}>
-                {leg.parlayProgress}%
-              </Text>
             </View>
           </View>
         </Card>
