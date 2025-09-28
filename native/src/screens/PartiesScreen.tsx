@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView } from 'react-native';
+import { View, Text, Modal, TextInput, Pressable, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '@/theme/tokens';
 import { Card, Button, Badge } from '@/components/ui';
+import { ConnectedAccountsModal } from '@/components/ConnectedAccountsModal';
 import { useStore } from '@/store/AppStore';
 import { DateRangePicker, validateDateRange } from '@/components/DatePicker';
 
@@ -36,6 +37,7 @@ export const PartiesScreen: React.FC = () => {
   const [walletError, setWalletError] = useState<string>('');
   const [dateError, setDateError] = useState<string>('');
   const [createError, setCreateError] = useState<string>('');
+  const [accountsModalVisible, setAccountsModalVisible] = useState<boolean>(false);
   const [showInviteCode, setShowInviteCode] = useState(false);
   const [createdParty, setCreatedParty] = useState<any>(null);
   const [inviteCode, setInviteCode] = useState<string>('');
@@ -202,9 +204,31 @@ export const PartiesScreen: React.FC = () => {
       {/* Header */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing(2) }}>
         <Text style={{ color: colors.textHigh, fontSize: 20, fontWeight: '700' }}>Your Parties</Text>
-        <Button variant='primary' onPress={() => setOpen(true)}>
-          <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
-        </Button>
+        
+        {/* Only show Connected Sportsbooks button if user is logged in */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setAccountsModalVisible(true)}
+            style={{
+              backgroundColor: 'transparent',
+              paddingHorizontal: spacing(1),
+              paddingVertical: spacing(1),
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.primary,
+              marginRight: spacing(1),
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600', textAlign: 'center', lineHeight: 14 }}>
+              Connect{'\n'}Sportsbooks
+            </Text>
+          </TouchableOpacity>
+          <Button variant='primary' onPress={() => setOpen(true)}>
+            <Text style={{ color: '#000', fontSize: 12, fontWeight: '600' }}>Create / Join</Text>
+          </Button>
+        </View>
       </View>
 
       {/* Wallet */}
@@ -595,36 +619,42 @@ export const PartiesScreen: React.FC = () => {
             )}
           </Pressable>
         </Pressable>
-      </Modal>
+        </Modal>
 
-      {/* Invite Code Display Modal */}
-      <Modal visible={showInviteCode} transparent animationType='fade' onRequestClose={() => setShowInviteCode(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowInviteCode(false)}>
-          <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
-            <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-              Party Created Successfully!
-            </Text>
-            
-            <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16 }}>
-              Share this invite code with friends to let them join your party:
-            </Text>
-            
-            <View style={{ backgroundColor: colors.chip, borderRadius: 8, padding: 16, marginBottom: 16, alignItems: 'center' }}>
-              <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
-                {inviteCode}
+        {/* Connected Accounts Modal */}
+        <ConnectedAccountsModal
+          visible={accountsModalVisible}
+          onClose={() => setAccountsModalVisible(false)}
+        />
+
+        {/* Invite Code Display Modal */}
+        <Modal visible={showInviteCode} transparent animationType='fade' onRequestClose={() => setShowInviteCode(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: spacing(2) }} onPress={() => setShowInviteCode(false)}>
+            <Pressable style={{ backgroundColor: colors.slate, borderRadius: 12, borderColor: colors.steel, borderWidth: 1, padding: 16 }} onPress={(e) => e.stopPropagation()}>
+              <Text style={{ color: colors.textHigh, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+                Party Created Successfully!
               </Text>
-            </View>
-            
-            <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
-              Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
-            </Text>
-            
-            <Button variant='primary' onPress={() => setShowInviteCode(false)}>
-              <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
-            </Button>
+              
+              <Text style={{ color: colors.textMid, fontSize: 14, marginBottom: 16 }}>
+                Share this invite code with friends to let them join your party:
+              </Text>
+              
+              <View style={{ backgroundColor: colors.chip, borderRadius: 8, padding: 16, marginBottom: 16, alignItems: 'center' }}>
+                <Text style={{ color: colors.textHigh, fontSize: 24, fontWeight: '700', letterSpacing: 2 }}>
+                  {inviteCode}
+                </Text>
+              </View>
+              
+              <Text style={{ color: colors.textLow, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
+                Party: {createdParty?.name} • {createdParty?.type === 'competitive' ? 'Competitive' : 'Friendly'} • 1/16 members
+              </Text>
+              
+              <Button variant='primary' onPress={() => setShowInviteCode(false)}>
+                <Text style={{ color: '#000', fontSize: 14, fontWeight: '600' }}>Got it!</Text>
+              </Button>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
       </View>
     </SafeAreaView>
   );
