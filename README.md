@@ -1,6 +1,7 @@
 # ParlayParty 🏈⚡
 
-ParlayParty is a social sports betting app designed to make watching sports more engaging with friends. Instead of relying on live data, the app uses a unique **AI simulation engine** to generate original, play-by-play NFL game narratives. This creates a shared, synchronized experience where everyone in your party follows the same custom game together in real-time.
+ParlayParty is a social sports betting app designed to make watching sports more engaging with friends. Instead of relying on live data, the app uses a unique **AI simulation engine** to generate original, play-by-play NFL game narratives. This creates a shared, synchronized experience where everyone in your party follows the same custom game together in real-time. This was a project for HackGT 12, here is the Devpost link if you want to see a demo:
+https://devpost.com/software/parlayparty
 
 ## ✨ Key Features
 
